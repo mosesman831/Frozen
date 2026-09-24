@@ -27,6 +27,10 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName=Frozen
 CloseApplications=yes
 
+[Tasks]
+Name: "desktopicon"; Description: "Create a &desktop shortcut"; \
+    GroupDescription: "Additional icons:"
+
 [Files]
 ; core binaries
 Source: "{#BinDir}\frozen.exe";        DestDir: "{app}"; Flags: ignoreversion
@@ -43,6 +47,12 @@ Source: "..\extension\com.frozen.frozen.json"; DestDir: "{commonappdata}\Frozen\
 [Dirs]
 Name: "{commonappdata}\Frozen\bin"
 Name: "{commonappdata}\Frozen\logs"
+
+[Icons]
+Name: "{group}\Frozen"; Filename: "{app}\frozen-gui.exe"
+Name: "{group}\Uninstall Frozen"; Filename: "{uninstallexe}"
+Name: "{commondesktop}\Frozen"; Filename: "{app}\frozen-gui.exe"; \
+    Tasks: desktopicon
 
 [Registry]
 ; per-user helper autostart (all users)

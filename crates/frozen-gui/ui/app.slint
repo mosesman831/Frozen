@@ -1,0 +1,603 @@
+import { LineEdit, ComboBox, ScrollView } from "std-widgets.slint";
+
+export struct RuleRow { kind: string, value: string, negated: bool }
+export struct BlockRow {
+    name: string,
+    enabled: bool,
+    active: bool,
+    lock: string,
+    allow_mode: bool,
+    all_internet: bool,
+    rules: [RuleRow],
+    allowance: int,
+    allowance_left: int,
+    break_until: int,
+}
+export struct AuditRow { time: string, actor: string, action: string, detail: string }
+export struct StatRow { group: string, name: string, value: string }
+
+export global G {
+    in property <bool> connected;
+    in property <int> rev;
+    in property <int> now;
+    in property <[BlockRow]> blocks;
+    in property <[AuditRow]> audits;
+    in property <[StatRow]> stats;
+    in property <string> status_line: "connecting…";
+    in property <bool> paused;
+    in property <string> pomodoro: "";
+    in property <int> frozen_until;
+    in property <bool> frozen_locked;
+    // one-shot replies surfaced to the UI
+    in property <string> challenge_token: "";
+    in property <string> challenge_text: "";
+    in property <string> generated: "";
+    in property <string> last_error: "";
+    in property <string> toast: "";
+    // actions — Rust builds the payloads
+    callback start_block(string);
+    callback stop_block(string);
+    callback add_block(string);
+    callback remove_block(string);
+    callback add_rule(string, string, string);
+    callback remove_rule(string, string);
+    callback add_exception(string, string);
+    callback set_lock(string, string, string);
+    callback unlock(string, string);
+    callback delay_break(string);
+    callback random_break(string);
+    callback cause_break(string);
+    callback end_break(string);
+    callback complete_break(string, string);
+    callback pause_global(int);
+    callback resume_global();
+    callback pomo(string, string);
+    callback frozen_start(int, string, string);
+    callback frozen_stop(string);
+    callback refresh_stats();
+    callback refresh_audit();
+}
+
+// ---------- atoms ----------
+
+component Chip inherits Rectangle {
+    in property <string> label;
+    in property <color> bg: #1c2530;
+    in property <color> fg: #8aa0b4;
+    background: root.bg;
+    border-radius: 9px;
+    height: 18px;
+    Text {
+        text: root.label;
+        color: root.fg;
+        font-size: 10px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component Btn inherits Rectangle {
+    in property <string> label;
+    in property <color> bg: #223047;
+    in property <color> fg: #dbe7f3;
+    in property <bool> danger: false;
+    in property <bool> primary: false;
+    callback clicked();
+    height: 30px;
+    border-radius: 6px;
+    background: root.primary ? (ta.pressed ? #2559c7 : #2f6fed)
+        : root.danger ? (ta.pressed ? #a13333 : #7d2b2b)
+        : (ta.pressed ? #2c3d55 : root.bg);
+    animate background { duration: 80ms; }
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+        mouse-cursor: pointer;
+    }
+    Text {
+        text: root.label;
+        color: root.primary ? #ffffff : root.danger ? #f3d8d8 : root.fg;
+        font-size: 12px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component Card inherits Rectangle {
+    background: #131a24;
+    border-radius: 10px;
+    border-color: #1f2a3a;
+    border-width: 1px;
+}
+
+component Field inherits LineEdit {
+    height: 30px;
+    font-size: 12px;
+}
+
+component SectionTitle inherits Text {
+    color: #8aa0b4;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+// ---------- main ----------
+
+export component AppWindow inherits Window {
+    title: "Frozen";
+    min-width: 1000px;
+    min-height: 680px;
+    background: #0b0e14;
+    property <int> page: 0;
+    property <int> sel: -1;
+
+    function mod(a: int, b: int) -> int { a - Math.floor(a / b) * b }
+    function fmt_dur(s: int) -> string {
+        s <= 0 ? "0s" : (s >= 3600
+            ? Math.floor(s / 3600) + "h " + Math.floor(mod(s, 3600) / 60) + "m"
+            : s >= 60 ? Math.floor(s / 60) + "m " + mod(s, 60) + "s" : s + "s")
+    }
+
+    property <string> frozen_label: G.frozen_until > G.now
+        ? "FROZEN " + fmt_dur(G.frozen_until - G.now) : "";
+
+    // error / toast bar
+    if G.last_error != "" || G.toast != "" : Rectangle {
+        y: 0; height: 30px; width: parent.width;
+        z: 99;
+        background: G.last_error != "" ? #5a2020 : #1f4a2d;
+        Text {
+            x: 16px;
+            text: G.last_error != "" ? ("⚠ " + G.last_error) : G.toast;
+            color: #fff; font-size: 12px; vertical-alignment: center;
+        }
+    }
+
+    // random-break challenge modal
+    if G.challenge_text != "" : Rectangle {
+        z: 100;
+        background: #000000cc;
+        Card {
+            width: 560px; height: 300px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            VerticalLayout {
+                padding: 20px; spacing: 10px;
+                Text { text: "Random-text break"; color: #e6edf3; font-size: 14px; font-weight: 600; }
+                Text { text: "Type this exactly to start the break:"; color: #8aa0b4; font-size: 12px; }
+                Rectangle {
+                    background: #0b0e14; border-radius: 6px; height: 80px;
+                    border-color: #2c3d55; border-width: 1px;
+                    ScrollView {
+                        Text { text: G.challenge_text; color: #9ecbff; font-size: 13px; font-family: "Consolas"; wrap: word-wrap; x: 10px; y: 10px; }
+                    }
+                }
+                challenge_in := Field { placeholder-text: "type the text here…"; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Btn { label: "Cancel"; clicked => { G.challenge_text = ""; } }
+                    Btn { label: "Complete break"; primary: true;
+                        clicked => {
+                            G.complete_break(G.challenge_token, challenge_in.text);
+                            G.challenge_text = "";
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // generated credential modal (shown ONCE)
+    if G.generated != "" : Rectangle {
+        z: 101;
+        background: #000000cc;
+        Card {
+            width: 520px; height: 210px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            VerticalLayout {
+                padding: 20px; spacing: 10px;
+                Text { text: "Save this credential — it is shown ONCE"; color: #ffb454; font-size: 14px; font-weight: 700; }
+                Rectangle {
+                    background: #0b0e14; border-radius: 6px; height: 60px;
+                    border-color: #7d2b2b; border-width: 1px;
+                    ScrollView {
+                        Text { text: G.generated; color: #ffd08a; font-size: 13px; font-family: "Consolas"; wrap: word-wrap; x: 10px; y: 10px; }
+                    }
+                }
+                Text { text: "You need it to end early. Copy it somewhere unreachable."; color: #8aa0b4; font-size: 11px; }
+                Btn { label: "I saved it"; primary: true; clicked => { G.generated = ""; } }
+            }
+        }
+    }
+
+    HorizontalLayout {
+        // ---------- sidebar ----------
+        Rectangle {
+            width: 190px;
+            background: #0d1118;
+            border-color: #1c2634;
+            border-width: 1px;
+            VerticalLayout {
+                padding: 18px; spacing: 4px;
+                Text {
+                    text: "◈ FROZEN";
+                    color: #e6edf3; font-size: 17px; font-weight: 800; letter-spacing: 2px;
+                }
+                Text { text: "blocker"; color: #4d6175; font-size: 10px; letter-spacing: 3px; }
+                Rectangle { height: 18px; }
+                for item[i] in ["Dashboard", "Blocks", "Focus", "Stats", "Audit"] : Rectangle {
+                    height: 34px; border-radius: 6px;
+                    background: root.page == i ? #1b2740 : (ta-i.has-hover ? #141b26 : transparent);
+                    animate background { duration: 100ms; }
+                    Text {
+                        x: 12px;
+                        text: item;
+                        color: root.page == i ? #7fb0ff : #8aa0b4;
+                        font-size: 13px;
+                        font-weight: root.page == i ? 700 : 400;
+                        vertical-alignment: center;
+                    }
+                    ta-i := TouchArea { clicked => { root.page = i; } mouse-cursor: pointer; }
+                }
+                Rectangle {}
+            }
+        }
+
+        // ---------- content ----------
+        VerticalLayout {
+            // topbar
+            Rectangle {
+                height: 52px;
+                background: #0d1118;
+                border-color: #1c2634;
+                border-width: 1px;
+                HorizontalLayout {
+                    padding-left: 16px; padding-right: 16px; spacing: 10px;
+                    VerticalLayout {
+                        alignment: center;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Rectangle {
+                                width: 9px; height: 9px; border-radius: 5px; y: 5px;
+                                background: G.connected ? #3fb950 : #da3633;
+                            }
+                            Text { text: G.status_line; color: #8aa0b4; font-size: 12px; vertical-alignment: center; }
+                        }
+                    }
+                    if G.paused : Chip { label: "PAUSED"; bg: #5a4020; fg: #ffc26e; }
+                    if G.pomodoro != "" && G.pomodoro != "off" : Chip { label: "POMO " + G.pomodoro; bg: #1f3a52; fg: #79c0ff; }
+                    if root.frozen_label != "" : Chip { label: root.frozen_label; bg: #521f2d; fg: #ff8ea3; }
+                    Rectangle {}
+                }
+            }
+
+            // pages
+            Rectangle {
+                clip: true;
+
+                // ======= Dashboard =======
+                if root.page == 0 : VerticalLayout {
+                    padding: 22px; spacing: 16px;
+                    Text { text: "Dashboard"; color: #e6edf3; font-size: 20px; font-weight: 700; }
+                    HorizontalLayout {
+                        spacing: 14px;
+                        Card {
+                            min-width: 210px; height: 92px;
+                            VerticalLayout {
+                                padding: 14px; spacing: 4px;
+                                Text { text: "Block lists"; color: #8aa0b4; font-size: 11px; }
+                                Text { text: G.blocks.length; color: #e6edf3; font-size: 26px; font-weight: 700; }
+                            }
+                        }
+                        Card {
+                            min-width: 210px; height: 92px;
+                            VerticalLayout {
+                                padding: 14px; spacing: 4px;
+                                Text { text: "State rev"; color: #8aa0b4; font-size: 11px; }
+                                Text { text: G.rev; color: #e6edf3; font-size: 26px; font-weight: 700; }
+                            }
+                        }
+                        Card {
+                            min-width: 210px; height: 92px;
+                            VerticalLayout {
+                                padding: 14px; spacing: 4px;
+                                Text { text: "Frozen"; color: #8aa0b4; font-size: 11px; }
+                                Text {
+                                    text: root.frozen_label != "" ? root.frozen_label : "inactive";
+                                    color: root.frozen_label != "" ? #ff8ea3 : #e6edf3;
+                                    font-size: 18px; font-weight: 700;
+                                }
+                            }
+                        }
+                    }
+                    Card {
+                        height: 120px;
+                        VerticalLayout {
+                            padding: 16px; spacing: 10px;
+                            Text { text: "GLOBAL"; color: #8aa0b4; font-size: 11px; font-weight: 700; }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Btn { label: G.paused ? "Resume" : "Pause 5m"; primary: !G.paused;
+                                    clicked => { G.paused ? G.resume_global() : G.pause_global(300); } }
+                                Btn { label: "Go to Focus"; clicked => { root.page = 2; } }
+                            }
+                            Text { text: "Website blocking runs through the browser extension — rule changes apply instantly on state push."; color: #4d6175; font-size: 11px; }
+                        }
+                    }
+                    Rectangle {}
+                }
+
+                // ======= Blocks =======
+                if root.page == 1 : HorizontalLayout {
+                    padding: 22px; spacing: 16px;
+                    // list column
+                    VerticalLayout {
+                        width: 300px; spacing: 8px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            new_name := Field { placeholder-text: "new block name…"; }
+                            Btn { label: "+"; width: 36px; primary: true;
+                                clicked => {
+                                    if new_name.text != "" {
+                                        G.add_block(new_name.text);
+                                        new_name.text = "";
+                                    }
+                                }
+                            }
+                        }
+                        ScrollView {
+                            VerticalLayout {
+                                spacing: 6px;
+                                for b[i] in G.blocks : Rectangle {
+                                    height: 46px; border-radius: 8px;
+                                    background: root.sel == i ? #1b2740 : #131a24;
+                                    border-color: root.sel == i ? #2f6fed : #1f2a3a;
+                                    border-width: 1px;
+                                    HorizontalLayout {
+                                        padding-left: 10px; padding-right: 10px; spacing: 6px;
+                                        Rectangle {
+                                            width: 8px; height: 8px; border-radius: 4px; y: 19px;
+                                            background: b.active ? #3fb950 : (b.enabled ? #d29922 : #3a4a5c);
+                                        }
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Text { text: b.name; color: #e6edf3; font-size: 13px; font-weight: 600; }
+                                            Text {
+                                                text: (b.active ? "ACTIVE" : b.enabled ? "enabled" : "off")
+                                                    + " · " + b.rules.length + " rules"
+                                                    + (b.lock != "" && b.lock != "none" ? " · " + b.lock : "");
+                                                color: b.active ? #3fb950 : #5d7286; font-size: 10px;
+                                            }
+                                        }
+                                    }
+                                    TouchArea { clicked => { root.sel = i; } mouse-cursor: pointer; }
+                                }
+                            }
+                        }
+                    }
+
+                    // detail
+                    if root.sel >= 0 && root.sel < G.blocks.length : Card {
+                        ScrollView {
+                            VerticalLayout {
+                                padding: 18px; spacing: 12px;
+                                property <BlockRow> b: G.blocks[root.sel];
+
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Text { text: b.name; color: #e6edf3; font-size: 17px; font-weight: 700; }
+                                    if b.active : Chip { label: "ACTIVE"; bg: #14401f; fg: #3fb950; }
+                                    if b.lock != "" && b.lock != "none" : Chip { label: "lock: " + b.lock; bg: #521f2d; fg: #ff8ea3; }
+                                    if b.allow_mode : Chip { label: "allow-list"; bg: #1f3a52; fg: #79c0ff; }
+                                    if b.all_internet : Chip { label: "all-internet"; bg: #521f2d; fg: #ff8ea3; }
+                                    if b.allowance > 0 : Chip {
+                                        label: "allowance " + Math.floor(b.allowance_left / 60) + "m left";
+                                        bg: #5a4020; fg: #ffc26e;
+                                    }
+                                    Rectangle {}
+                                    Btn { label: b.enabled ? "Stop" : "Start"; primary: !b.enabled; danger: b.enabled;
+                                        clicked => {
+                                            b.enabled ? G.stop_block(b.name) : G.start_block(b.name);
+                                        }
+                                    }
+                                    Btn { label: "Delete"; danger: true;
+                                        clicked => { G.remove_block(b.name); root.sel = -1; }
+                                    }
+                                }
+
+                                SectionTitle { text: "RULES (blocked)"; }
+                                for r in b.rules : Rectangle {
+                                    height: r.negated ? 0px : 26px;
+                                    if !r.negated : HorizontalLayout {
+                                        spacing: 8px;
+                                        Chip { label: r.kind; width: 64px; }
+                                        Text { text: r.value; color: #dbe7f3; font-size: 12px; vertical-alignment: center; }
+                                        Rectangle {}
+                                        Btn { label: "✕"; width: 30px; danger: true;
+                                            clicked => { G.remove_rule(b.name, r.value); } }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    kind_cb := ComboBox { width: 110px; model: ["domain", "url", "app", "keyword"]; }
+                                    rule_in := Field { placeholder-text: "example.com or app.exe…"; }
+                                    Btn { label: "Block it"; primary: true;
+                                        clicked => {
+                                            if rule_in.text != "" {
+                                                G.add_rule(b.name, kind_cb.current-value, rule_in.text);
+                                                rule_in.text = "";
+                                            }
+                                        }
+                                    }
+                                }
+
+                                SectionTitle { text: "EXCEPTIONS (allowed)"; }
+                                for r in b.rules : Rectangle {
+                                    height: r.negated ? 24px : 0px;
+                                    if r.negated : HorizontalLayout {
+                                        spacing: 8px;
+                                        Chip { label: "allow"; bg: #14401f; fg: #3fb950; width: 64px; }
+                                        Text { text: r.value; color: #9ecb8f; font-size: 12px; vertical-alignment: center; }
+                                        Rectangle {}
+                                        Btn { label: "✕"; width: 30px; danger: true;
+                                            clicked => { G.remove_rule(b.name, r.value); } }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    ex_in := Field { placeholder-text: "exception — allowed even while blocking…"; }
+                                    Btn { label: "Add exception";
+                                        clicked => {
+                                            if ex_in.text != "" {
+                                                G.add_exception(b.name, ex_in.text);
+                                                ex_in.text = "";
+                                            }
+                                        }
+                                    }
+                                }
+
+                                SectionTitle { text: "LOCK"; }
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    lock_cb := ComboBox { width: 130px; model: ["none", "timer", "range", "password", "random", "restart", "allowance", "enforced", "frozen"]; }
+                                    lock_arg := Field { placeholder-text: "until(s) / password / len…"; }
+                                    Btn { label: "Set lock";
+                                        clicked => { G.set_lock(b.name, lock_cb.current-value, lock_arg.text); }
+                                    }
+                                    cred_in := Field { placeholder-text: "credential…"; }
+                                    Btn { label: "Unlock"; danger: true;
+                                        clicked => { G.unlock(b.name, cred_in.text); }
+                                    }
+                                }
+
+                                SectionTitle { text: "BREAKS"; }
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    Btn { label: "Delay break"; clicked => { G.delay_break(b.name); } }
+                                    Btn { label: "Random-text break"; clicked => { G.random_break(b.name); } }
+                                    Btn { label: "Cause break"; clicked => { G.cause_break(b.name); } }
+                                    Btn { label: "End break"; danger: true; clicked => { G.end_break(b.name); } }
+                                }
+                            }
+                        }
+                    }
+                    if !(root.sel >= 0 && root.sel < G.blocks.length) : Card {
+                        Text { text: "Select a block list on the left."; color: #4d6175; font-size: 13px; }
+                    }
+                }
+
+                // ======= Focus =======
+                if root.page == 2 : VerticalLayout {
+                    padding: 22px; spacing: 16px;
+                    Text { text: "Focus"; color: #e6edf3; font-size: 20px; font-weight: 700; }
+                    Card {
+                        height: 220px;
+                        VerticalLayout {
+                            padding: 18px; spacing: 10px;
+                            HorizontalLayout {
+                                spacing: 10px;
+                                Text { text: "FROZEN MODE"; color: #8aa0b4; font-size: 12px; font-weight: 700; }
+                                if root.frozen_label != "" : Chip { label: root.frozen_label; bg: #521f2d; fg: #ff8ea3; }
+                                if G.frozen_locked : Chip { label: "locked"; bg: #5a4020; fg: #ffc26e; }
+                            }
+                            Text { text: "Full-screen lockout: kills non-allowlisted apps, covers the desktop until the timer ends."; color: #4d6175; font-size: 11px; }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                fz_min := Field { width: 90px; placeholder-text: "minutes"; text: "60"; }
+                                fz_lock := ComboBox { width: 110px; model: ["none", "password", "random"]; }
+                                fz_arg := Field { width: 130px; placeholder-text: "password / len"; }
+                                Btn { label: "Start Frozen"; primary: true;
+                                    clicked => { G.frozen_start(fz_min.text.to-float(), fz_lock.current-value, fz_arg.text); }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                fz_cred := Field { placeholder-text: "credential to end early…"; }
+                                Btn { label: "End Frozen"; danger: true;
+                                    clicked => { G.frozen_stop(fz_cred.text); }
+                                }
+                            }
+                        }
+                    }
+                    Card {
+                        height: 170px;
+                        VerticalLayout {
+                            padding: 18px; spacing: 10px;
+                            HorizontalLayout {
+                                spacing: 10px;
+                                Text { text: "POMODORO"; color: #8aa0b4; font-size: 12px; font-weight: 700; }
+                                if G.pomodoro != "" && G.pomodoro != "off" : Chip { label: G.pomodoro; bg: #1f3a52; fg: #79c0ff; }
+                            }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                for p in ["classic", "long", "sprint"] : Btn {
+                                    label: p;
+                                    clicked => { G.pomo("start", p); }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                Btn { label: "Skip"; clicked => { G.pomo("skip", ""); } }
+                                Btn { label: "Pause"; clicked => { G.pomo("pause", ""); } }
+                                Btn { label: "Resume"; clicked => { G.pomo("resume", ""); } }
+                                Btn { label: "Stop"; danger: true; clicked => { G.pomo("stop", ""); } }
+                            }
+                        }
+                    }
+                    Rectangle {}
+                }
+
+                // ======= Stats =======
+                if root.page == 3 : VerticalLayout {
+                    padding: 22px; spacing: 10px;
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Text { text: "Stats"; color: #e6edf3; font-size: 20px; font-weight: 700; }
+                        Rectangle {}
+                        Btn { label: "Refresh"; width: 90px; clicked => { G.refresh_stats(); } }
+                    }
+                    ScrollView {
+                        Card {
+                            VerticalLayout {
+                                padding: 14px; spacing: 4px;
+                                for s in G.stats : HorizontalLayout {
+                                    spacing: 8px;
+                                    Text { text: s.group; color: #4d6175; font-size: 11px; width: 110px; }
+                                    Text { text: s.name; color: #dbe7f3; font-size: 12px; }
+                                    Rectangle {}
+                                    Text { text: s.value; color: #7fb0ff; font-size: 12px; }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ======= Audit =======
+                if root.page == 4 : VerticalLayout {
+                    padding: 22px; spacing: 10px;
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Text { text: "Audit"; color: #e6edf3; font-size: 20px; font-weight: 700; }
+                        Rectangle {}
+                        Btn { label: "Refresh"; width: 90px; clicked => { G.refresh_audit(); } }
+                    }
+                    ScrollView {
+                        Card {
+                            VerticalLayout {
+                                padding: 14px; spacing: 3px;
+                                for a in G.audits : HorizontalLayout {
+                                    spacing: 8px;
+                                    Text { text: a.time; color: #4d6175; font-size: 11px; width: 70px; }
+                                    Text { text: a.actor; color: #7fb0ff; font-size: 11px; width: 60px; }
+                                    Text { text: a.action; color: #e6edf3; font-size: 11px; width: 150px; }
+                                    Text { text: a.detail; color: #8aa0b4; font-size: 11px; }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
