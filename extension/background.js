@@ -13,6 +13,9 @@ let state = { rev: 0, blocks: [], flags: {} };
 let connected = false;
 
 // ---- native messaging bridge ----
+const rpcPending = new Map();
+let rpcSeq = 1;
+
 function connect() {
   try {
     port = chrome.runtime.connectNative(NMH);
@@ -24,6 +27,12 @@ function connect() {
     if (!env || !env.op) return;
     if (env.op === "state") {
       state = env.payload || state;
+    } else if (env.op === "ok" || env.op === "err") {
+      const r = rpcPending.get(env.id);
+      if (r) {
+        rpcPending.delete(env.id);
+        r(env);
+      }
     } else if (env.op === "cmd") {
       // future: overlay/close-tab commands
     }
@@ -82,6 +91,17 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((d) => {
 // ---- content-script verdict service + stats ----
 chrome.runtime.onMessage.addListener((msg, sender, respond) => {
   if (!msg || !msg.type) return;
+  if (msg.type === "rpc") {
+    // options/popup → svc call relayed over the single native port
+    if (!connected || !port) { respond({ err: "disconnected" }); return true; }
+    const id = rpcSeq++;
+    rpcPending.set(id, (env) => {
+      if (env.op === "ok") respond({ ok: env.payload });
+      else respond({ err: (env.payload && env.payload.msg) || "rpc error", code: env.payload && env.payload.code });
+    });
+    send({ op: "rpc", id, payload: { method: msg.method, params: msg.params || {} } });
+    return true;
+  }
   if (msg.type === "get-state") {
     respond({ state });
     return true;

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; font-family: "Segoe UI", system-ui, sans-serif; }
+  body { width: 320px; background: #0e0f13; color: #e6e8ee; padding: 12px; font-size: 13px; }
+  h1 { font-size: 13px; letter-spacing: 3px; color: #7aa2ff; margin-bottom: 8px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+         padding: 6px 8px; background: #171923; border-radius: 6px; margin-bottom: 6px; }
+  .lbl { color: #9aa0b0; font-size: 12px; }
+  .val { font-weight: 600; }
+  .active { color: #7ee787; } .off { color: #8b8f9e; } .bad { color: #ff7b72; }
+  button { background: #242836; color: #e6e8ee; border: 1px solid #333a52; border-radius: 6px;
+           padding: 5px 9px; font-size: 12px; cursor: pointer; }
+  button:hover { background: #2e3550; }
+  button.primary { background: #2f4bd8; border-color: #4a6cf7; }
+  button.warn { background: #5c2b2b; border-color: #8a4444; }
+  button:disabled { opacity: .4; cursor: default; }
+  .btns { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .block { display: flex; align-items: center; justify-content: space-between;
+           padding: 5px 8px; border: 1px solid #222839; border-radius: 6px; margin-bottom: 4px; }
+  .block .nm { font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+         margin-right: 6px; background: #555; }
+  .dot.on { background: #7ee787; } .dot.lock { background: #ffbb55; }
+  .sec { color: #7aa2ff; font-size: 11px; letter-spacing: 1.5px; margin: 10px 0 4px; }
+  #err { color: #ff7b72; font-size: 12px; min-height: 15px; margin-bottom: 4px; }
+  .frozen { border: 1px solid #8a4444; }
+  a { color: #7aa2ff; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>FROZEN</h1>
+  <div id="err"></div>
+  <div class="row"><span class="lbl">service</span><span class="val" id="svc">…</span></div>
+  <div class="row"><span class="lbl">state</span><span class="val" id="st">…</span></div>
+  <div class="row" id="frozenrow" style="display:none"><span class="lbl bad">FROZEN</span><span class="val bad" id="fzr"></span></div>
+  <div class="row" id="pomorow" style="display:none"><span class="lbl">pomodoro</span><span class="val" id="pomo"></span></div>
+  <div class="sec">BLOCKS</div>
+  <div id="blocks"></div>
+  <div class="sec">BREAKS</div>
+  <div class="btns">
+    <button id="bd" title="wait 60s first">delay break</button>
+    <button id="br" title="type random text">random-text break</button>
+    <button id="bc" title="app/site actually needed">cause break</button>
+    <button id="be">end break</button>
+  </div>
+  <div class="sec">GLOBAL</div>
+  <div class="btns">
+    <button id="pause">pause 5m</button>
+    <button id="resume">resume</button>
+    <a href="#" id="opts">options</a>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

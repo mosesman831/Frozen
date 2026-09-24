@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Frozen options</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; font-family: "Segoe UI", system-ui, sans-serif; }
+  body { background: #0e0f13; color: #e6e8ee; font-size: 14px; display: flex; min-height: 100vh; }
+  nav { width: 170px; padding: 20px 10px; border-right: 1px solid #222839; flex-shrink: 0; }
+  nav h1 { font-size: 15px; letter-spacing: 3px; color: #7aa2ff; margin-bottom: 18px; }
+  nav a { display: block; padding: 8px 10px; color: #9aa0b0; text-decoration: none;
+          border-radius: 6px; margin-bottom: 2px; }
+  nav a.on, nav a:hover { background: #1d2233; color: #e6e8ee; }
+  main { flex: 1; padding: 20px 26px; max-width: 900px; }
+  h2 { font-size: 16px; margin-bottom: 12px; }
+  .card { background: #171923; border: 1px solid #222839; border-radius: 8px;
+          padding: 14px; margin-bottom: 14px; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  input, select { background: #0e0f13; color: #e6e8ee; border: 1px solid #333a52;
+                  border-radius: 6px; padding: 6px 9px; font-size: 13px; }
+  button { background: #242836; color: #e6e8ee; border: 1px solid #333a52; border-radius: 6px;
+           padding: 6px 10px; font-size: 13px; cursor: pointer; }
+  button:hover { background: #2e3550; }
+  button.primary { background: #2f4bd8; border-color: #4a6cf7; }
+  button.warn { background: #5c2b2b; border-color: #8a4444; }
+  button.small { padding: 3px 8px; font-size: 12px; }
+  .muted { color: #9aa0b0; font-size: 12px; }
+  .rules { margin: 10px 0; }
+  .rule { display: flex; gap: 8px; align-items: center; padding: 4px 0;
+          border-bottom: 1px solid #20263a; }
+  .rule code { color: #9ecbff; flex: 1; }
+  .tag { font-size: 10px; background: #242b45; border-radius: 4px; padding: 2px 6px;
+         color: #9aa0b0; text-transform: uppercase; }
+  .tag.active { background: #1e4630; color: #7ee787; }
+  .tag.locked { background: #4a3416; color: #ffbb55; }
+  #err { color: #ff7b72; margin: 8px 0; min-height: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px,1fr)); gap: 10px; }
+  .stat { background: #101220; border-radius: 6px; padding: 10px; }
+  .stat .n { font-size: 20px; font-weight: 700; color: #7aa2ff; }
+  .sec { display: none; }
+  .sec.on { display: block; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid #20263a; }
+  th { color: #9aa0b0; font-weight: 400; }
+  .spacer { flex: 1; }
+</style>
+</head>
+<body>
+<nav>
+  <h1>FROZEN</h1>
+  <a href="#blocks" class="on">Blocks</a>
+  <a href="#frozen">Frozen mode</a>
+  <a href="#stats">Statistics</a>
+  <a href="#audit">Audit log</a>
+</nav>
+<main>
+  <div id="err"></div>
+
+  <section id="blocks" class="sec on">
+    <div class="row" style="margin-bottom:14px">
+      <h2>Blocks</h2><div class="spacer"></div>
+      <input id="newname" placeholder="new block name">
+      <button class="primary" id="addblk">+ create</button>
+    </div>
+    <div id="blocklist"></div>
+  </section>
+
+  <section id="frozen" class="sec">
+    <h2>Frozen mode — whole-computer lockout</h2>
+    <div class="card">
+      <div class="muted" id="fstatus">status: checking…</div>
+      <div class="row" style="margin-top:10px">
+        <input id="fhours" placeholder="duration e.g. 2h / 45m" style="width:150px">
+        <select id="flock">
+          <option value="none">no exit lock</option>
+          <option value="password">password lock</option>
+          <option value="random">random-text lock</option>
+        </select>
+        <input id="farg" placeholder="password / text length" style="width:170px">
+        <button class="warn" id="fstart">start frozen</button>
+      </div>
+      <div class="muted" style="margin-top:8px">During frozen, every process except a small
+      safelist (explorer, dwm, frozen itself) is killed on spawn, and the overlay covers the
+      whole screen until the timer ends or you pass the exit ceremony.</div>
+    </div>
+  </section>
+
+  <section id="stats" class="sec">
+    <h2>Statistics</h2>
+    <div class="grid" id="statgrid"></div>
+    <div class="card"><div id="blockedlist" class="muted"></div></div>
+  </section>
+
+  <section id="audit" class="sec">
+    <h2>Audit log</h2>
+    <div class="card"><table><thead><tr><th>time</th><th>actor</th><th>action</th><th>detail</th></tr></thead>
+    <tbody id="audittb"></tbody></table></div>
+  </section>
+</main>
+<script src="options.js"></script>
+</body>
+</html>
