@@ -108,6 +108,11 @@ enum Cmd {
         #[arg(long, default_value_t = 50)]
         last: i64,
     },
+    /// Usage + blocked-attempt stats
+    Stats {
+        #[arg(long, default_value_t = 7)]
+        days: u64,
+    },
     /// Windows service management
     Service {
         #[command(subcommand)]
@@ -194,6 +199,7 @@ async fn main() -> Result<()> {
             ("pomodoro", pj)
         }
         Cmd::Audit { last } => ("audit", json!({"last": last})),
+        Cmd::Stats { days } => ("stats", json!({"days": days})),
         Cmd::Rpc { method, params } => {
             let m = method.as_str();
             let p: Value = serde_json::from_str(params).context("params must be JSON")?;
@@ -282,6 +288,16 @@ async fn rpc(method: &str, params: Value) -> Result<Value> {
     }
 }
 
+fn fmt_dur(s: i64) -> String {
+    if s >= 3600 {
+        format!("{}h{:02}m", s / 3600, (s % 3600) / 60)
+    } else if s >= 60 {
+        format!("{}m{:02}s", s / 60, s % 60)
+    } else {
+        format!("{s}s")
+    }
+}
+
 fn print_human(method: &str, v: &Value) {
     match method {
         "status" => {
@@ -343,6 +359,41 @@ fn print_human(method: &str, v: &Value) {
                         r["actor"].as_str().unwrap_or(""),
                         r["action"].as_str().unwrap_or(""),
                         r["detail"].as_str().unwrap_or(""));
+                }
+            }
+        }
+        "stats" => {
+            let domains = v["domains"].as_array();
+            let apps = v["apps"].as_array();
+            let blocked = v["blocked"].as_array();
+            if let Some(rows) = domains {
+                println!("top domains");
+                for r in rows.iter().take(15) {
+                    println!("  {}  {:<30} {}  visits={}  blocked={}",
+                        r["day"].as_str().unwrap_or(""),
+                        r["domain"].as_str().unwrap_or(""),
+                        fmt_dur(r["seconds"].as_i64().unwrap_or(0)),
+                        r["visits"].as_u64().unwrap_or(0),
+                        r["blocked"].as_u64().unwrap_or(0));
+                }
+            }
+            if let Some(rows) = apps {
+                println!("top apps");
+                for r in rows.iter().take(15) {
+                    println!("  {}  {:<30} {}",
+                        r["day"].as_str().unwrap_or(""),
+                        r["process"].as_str().unwrap_or(""),
+                        fmt_dur(r["seconds"].as_i64().unwrap_or(0)));
+                }
+            }
+            if let Some(rows) = blocked {
+                println!("blocked attempts");
+                for r in rows.iter().take(15) {
+                    println!("  {}  {:<8} {:<30} x{}",
+                        r["day"].as_str().unwrap_or(""),
+                        r["kind"].as_str().unwrap_or(""),
+                        r["target"].as_str().unwrap_or(""),
+                        r["attempts"].as_u64().unwrap_or(0));
                 }
             }
         }

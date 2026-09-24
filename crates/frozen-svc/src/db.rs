@@ -377,6 +377,53 @@ impl Store {
         );
     }
 
+    /// Aggregate stats for the CLI: per-day app usage, domain usage, and
+    /// blocked-attempt counters over the last `days` days.
+    pub fn stats_summary(&self, days: u32) -> Result<serde_json::Value> {
+        let mut apps = self
+            .helper
+            .prepare(
+                "SELECT day, process, SUM(seconds) s FROM usage_app
+                 WHERE day >= date('now','localtime', ?1)
+                 GROUP BY day, process ORDER BY day DESC, s DESC",
+            )?
+            .query_map(params![format!("-{days} days")], |r| {
+                Ok(serde_json::json!({"day": r.get::<_,String>(0)?, "process": r.get::<_,String>(1)?, "seconds": r.get::<_,i64>(2)?}))
+            })?
+            .filter_map(|r| r.ok())
+            .collect::<Vec<_>>();
+        let mut domains = self
+            .browser
+            .prepare(
+                "SELECT day, domain, seconds, visits, blocked FROM usage_domain
+                 WHERE day >= date('now','localtime', ?1)
+                 ORDER BY day DESC, seconds DESC",
+            )?
+            .query_map(params![format!("-{days} days")], |r| {
+                Ok(serde_json::json!({"day": r.get::<_,String>(0)?, "domain": r.get::<_,String>(1)?,
+                    "seconds": r.get::<_,i64>(2)?, "visits": r.get::<_,i64>(3)?, "blocked": r.get::<_,i64>(4)?}))
+            })?
+            .filter_map(|r| r.ok())
+            .collect::<Vec<_>>();
+        let mut blocked = self
+            .helper
+            .prepare(
+                "SELECT day, kind, target, attempts FROM stats_blocked
+                 WHERE day >= date('now','localtime', ?1)
+                 ORDER BY day DESC, attempts DESC",
+            )?
+            .query_map(params![format!("-{days} days")], |r| {
+                Ok(serde_json::json!({"day": r.get::<_,String>(0)?, "kind": r.get::<_,String>(1)?,
+                    "target": r.get::<_,String>(2)?, "attempts": r.get::<_,i64>(3)?}))
+            })?
+            .filter_map(|r| r.ok())
+            .collect::<Vec<_>>();
+        apps.truncate(200);
+        domains.truncate(200);
+        blocked.truncate(200);
+        Ok(serde_json::json!({"apps": apps, "domains": domains, "blocked": blocked}))
+    }
+
     pub fn record_domain(&self, domain: &str, seconds: i64, blocked: bool) {
         let day = chrono::Local::now().format("%Y-%m-%d").to_string();
         let _ = self.browser.execute(

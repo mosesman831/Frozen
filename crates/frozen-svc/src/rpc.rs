@@ -30,6 +30,7 @@ pub async fn dispatch(shared: &Shared, method: &str, params: &Value) -> Result<V
         "start-cause-break" => start_cause_break(shared, params).await,
         "end-break" | "end_break" => end_break(shared, params).await,
         "audit" => audit(shared, params).await,
+        "stats" => stats(shared, params).await,
         "set-setting" | "set_setting" => set_setting(shared, params).await,
         "get-setting" | "get_setting" => get_setting(shared, params).await,
         _ => Err(anyhow::anyhow!("unknown rpc: {method}")),
@@ -592,6 +593,12 @@ async fn end_break(shared: &Shared, p: &Value) -> Result<Value> {
         c.bump_rev();
     }
     Ok(json!({ "ok": true }))
+}
+
+async fn stats(shared: &Shared, p: &Value) -> Result<Value> {
+    let days = p["days"].as_u64().unwrap_or(7).clamp(1, 90) as u32;
+    let c = shared.read().await;
+    c.store.stats_summary(days)
 }
 
 async fn audit(shared: &Shared, p: &Value) -> Result<Value> {
