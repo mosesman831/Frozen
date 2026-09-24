@@ -1,0 +1,50 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/frozen-common",
+    "crates/frozen-platform",
+    "crates/frozen-svc",
+    "crates/frozen-helper",
+    "crates/frozen-cli",
+    "crates/frozen-nmh",
+]
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+rand = "0.8"
+regex = "1"
+clap = { version = "4", features = ["derive"] }
+sha2 = "0.10"
+hmac = "0.12"
+argon2 = "0.5"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Threading",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_WindowsProgramming",
+    "Win32_System_SystemServices",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Console",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_Services",
+    "Win32_System_SystemInformation",
+] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
+panic = "abort"

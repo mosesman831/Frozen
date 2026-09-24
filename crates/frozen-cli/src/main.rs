@@ -1,0 +1,313 @@
+//! frozen — CLI control surface (spec §24).
+
+use anyhow::{Context, Result};
+use clap::{Parser, Subcommand};
+use frozen_common::pipe::{read_env, win, write_env};
+use frozen_common::proto::*;
+use serde_json::{json, Value};
+use std::process;
+use uuid::Uuid;
+
+#[derive(Parser)]
+#[command(name = "frozen", version, about = "Frozen blocker control")]
+struct Cli {
+    #[command(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(Subcommand)]
+enum Cmd {
+    /// Service + engine status
+    Status,
+    /// List blocks
+    ListBlocks,
+    /// Create a block list
+    AddBlock {
+        name: String,
+        /// whitelist mode: only listed sites are reachable
+        #[arg(long)]
+        allow: bool,
+        /// block the whole internet except exceptions
+        #[arg(long)]
+        all_internet: bool,
+    },
+    /// Delete a block list
+    RemoveBlock { name: String },
+    /// Add a rule to a block
+    AddRule {
+        block: String,
+        /// domain|wildcard|url|keyword|regex|path|title|app|folder
+        kind: String,
+        value: String,
+        /// exception (allow) rule
+        #[arg(long)]
+        negated: bool,
+    },
+    /// Remove a rule from a block
+    RemoveRule { block: String, value: String },
+    /// Add a site exception to a block
+    AddException { block: String, site: String },
+    /// Enable a block now
+    Start { name: String },
+    /// Disable a block (subject to locks)
+    Stop { name: String },
+    /// Toggle a block
+    Toggle { name: String },
+    /// Pause all blocking
+    Pause,
+    /// Resume blocking
+    Resume,
+    /// Lock a block: none|timer|range|password|random|restart|allowance|enforced|frozen
+    Lock {
+        block: String,
+        kind: String,
+        /// timer: minutes | range: HH:MM-HH:MM | random: length[,perfect] | allowance: minutes
+        #[arg(long)]
+        arg: Option<String>,
+    },
+    /// Pomodoro: status|start|stop
+    Pomodoro {
+        action: String,
+        /// work seconds (for start)
+        #[arg(long, default_value_t = 1500)]
+        work_s: u64,
+    },
+    /// Audit log tail
+    Audit {
+        #[arg(long, default_value_t = 50)]
+        last: i64,
+    },
+    /// Windows service management
+    Service {
+        #[command(subcommand)]
+        action: SvcCmd,
+    },
+    /// Raw RPC escape hatch
+    Rpc {
+        method: String,
+        #[arg(long, default_value = "{}")]
+        params: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum SvcCmd {
+    Install,
+    Uninstall,
+    Start,
+    Stop,
+    Status,
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let cli = Cli::parse();
+    match cli.cmd {
+        Cmd::Service { action } => return service_cmd(action),
+        _ => {}
+    }
+
+    let (method, params) = match &cli.cmd {
+        Cmd::Status => ("status", json!({})),
+        Cmd::ListBlocks => ("list-blocks", json!({})),
+        Cmd::AddBlock { name, allow, all_internet } => (
+            "add-block",
+            json!({"name": name, "allow": allow, "all_internet": all_internet}),
+        ),
+        Cmd::RemoveBlock { name } => ("remove-block", json!({"name": name})),
+        Cmd::AddRule { block, kind, value, negated } => (
+            "add-rule",
+            json!({"block": block, "kind": kind, "value": value, "negated": negated}),
+        ),
+        Cmd::RemoveRule { block, value } => {
+            ("remove-rule", json!({"block": block, "value": value}))
+        }
+        Cmd::AddException { block, site } => {
+            // domain for bare hosts; url once there's a path/query
+            let kind = if site.contains('/') { "url" } else { "domain" };
+            ("add-exception", json!({"block": block, "value": site, "kind": kind}))
+        }
+        Cmd::Start { name } => ("start", json!({"name": name})),
+        Cmd::Stop { name } => ("stop", json!({"name": name})),
+        Cmd::Toggle { name } => ("toggle", json!({"name": name})),
+        Cmd::Pause => ("pause", json!({})),
+        Cmd::Resume => ("resume", json!({})),
+        Cmd::Lock { block, kind, arg } => ("lock", lock_params(block, kind, arg.as_deref())?),
+        Cmd::Pomodoro { action, work_s } => {
+            ("pomodoro", json!({"action": action, "work_s": work_s}))
+        }
+        Cmd::Audit { last } => ("audit", json!({"last": last})),
+        Cmd::Rpc { method, params } => {
+            let m = method.as_str();
+            let p: Value = serde_json::from_str(params).context("params must be JSON")?;
+            (m, p)
+        }
+        _ => unreachable!(),
+    };
+
+    let out = rpc(method, params).await;
+    match out {
+        Ok(v) => {
+            print_human(method, &v);
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::exit(1)
+        }
+    }
+}
+
+fn lock_params(block: &str, kind: &str, arg: Option<&str>) -> Result<Value> {
+    let lock = match kind {
+        "none" => json!({"type": "none"}),
+        "timer" => {
+            let mins: i64 = arg.unwrap_or("60").parse().context("timer minutes")?;
+            let until = chrono::Local::now() + chrono::Duration::minutes(mins);
+            json!({"type": "timer", "until": until.timestamp()})
+        }
+        "range" => {
+            let a = arg.context("range needs HH:MM-HH:MM")?;
+            let (s, e) = a.split_once('-').context("range needs HH:MM-HH:MM")?;
+            json!({"type": "range", "start_hm": s, "end_hm": e})
+        }
+        "password" => json!({"type": "password", "hash": arg.unwrap_or("")}),
+        "random" => {
+            let a = arg.unwrap_or("32");
+            let (len, perfect) = match a.split_once(',') {
+                Some((l, p)) => (l.parse().unwrap_or(32), p == "perfect"),
+                None => (a.parse().unwrap_or(32), false),
+            };
+            json!({"type": "random_text", "len": len, "perfect": perfect})
+        }
+        "restart" => json!({"type": "restart"}),
+        "allowance" => {
+            let mins: u64 = arg.unwrap_or("60").parse().context("allowance minutes")?;
+            json!({"type": "allowance", "seconds": mins * 60})
+        }
+        "enforced" => json!({"type": "enforced"}),
+        "frozen" => json!({"type": "frozen"}),
+        _ => anyhow::bail!("unknown lock kind: {kind}"),
+    };
+    Ok(json!({"block": block, "lock": lock}))
+}
+
+/// Connect to the service, handshake, send one RPC, print the response.
+async fn rpc(method: &str, params: Value) -> Result<Value> {
+    let stream = win::connect(PIPE_APP)
+        .await
+        .context("cannot reach frozen service — is frozen-svc running?")?;
+    let (mut rd, mut wr) = tokio::io::split(stream);
+
+    let hello = Hello {
+        client: "cli".into(),
+        browser: None,
+        pid: process::id(),
+        nonce: Some(Uuid::new_v4().to_string()),
+    };
+    write_env(&mut wr, &Envelope::new(op::HELLO, serde_json::to_value(hello)?)).await?;
+
+    let req = Envelope::req(op::RPC, 1, json!({"method": method, "params": params}));
+    write_env(&mut wr, &req).await?;
+
+    // replies may interleave with state pushes — wait for our id
+    loop {
+        let env = read_env(&mut rd).await?;
+        if env.id == 1 {
+            if env.op == op::ERR {
+                anyhow::bail!("{}: {}",
+                    env.payload["code"].as_str().unwrap_or("ERR"),
+                    env.payload["message"].as_str().unwrap_or("unknown"));
+            }
+            return Ok(env.payload);
+        }
+    }
+}
+
+fn print_human(method: &str, v: &Value) {
+    match method {
+        "status" => {
+            println!("frozen {}", v["version"].as_str().unwrap_or("?"));
+            println!("  service:      running");
+            println!("  helper:       {}", v["helper_connected"]);
+            println!("  ext clients:  {}", v["ext_clients"]);
+            println!("  blocks:       {} total / {} active", v["blocks_total"], v["blocks_active"]);
+            println!("  state rev:    {}", v["rev"]);
+        }
+        "list-blocks" | "list_blocks" => {
+            let blocks = v["blocks"].as_array();
+            if let Some(bl) = blocks {
+                if bl.is_empty() {
+                    println!("no blocks defined");
+                }
+                for b in bl {
+                    let state = if b["active"].as_bool() == Some(true) { "ACTIVE" }
+                        else if b["enabled"].as_bool() == Some(true) { "enabled" }
+                        else { "off" };
+                    println!("{:<30} {:<8} {:>3} rules  lock={}",
+                        b["name"].as_str().unwrap_or("?"),
+                        state,
+                        b["rules"].as_u64().unwrap_or(0),
+                        b["lock"]["type"].as_str().unwrap_or("none"));
+                }
+            }
+        }
+        "audit" => {
+            if let Some(rows) = v["audit"].as_array() {
+                for r in rows {
+                    let ts = r["ts"].as_i64().unwrap_or(0);
+                    let t = chrono::DateTime::from_timestamp(ts, 0)
+                        .map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string())
+                        .unwrap_or_default();
+                    println!("{t}  {:<8} {:<16} {}",
+                        r["actor"].as_str().unwrap_or(""),
+                        r["action"].as_str().unwrap_or(""),
+                        r["detail"].as_str().unwrap_or(""));
+                }
+            }
+        }
+        _ => println!("{}", serde_json::to_string_pretty(v).unwrap_or_default()),
+    }
+}
+
+// ---- service management (sc.exe; SCM API comes with the installer in M6) ----
+
+fn service_cmd(action: SvcCmd) -> Result<()> {
+    let svc = frozen_platform::svc_name();
+    match action {
+        SvcCmd::Install => {
+            let exe = std::env::current_exe()?
+                .parent()
+                .unwrap()
+                .join("frozen-svc.exe");
+            let out = process::Command::new("sc")
+                .args(["create", &svc, "binpath="])
+                .arg(exe)
+                .args(["start=", "auto"])
+                .output()?;
+            println!("{}", String::from_utf8_lossy(&out.stdout));
+            if !out.status.success() {
+                eprintln!("{}", String::from_utf8_lossy(&out.stderr));
+                anyhow::bail!("sc create failed");
+            }
+        }
+        SvcCmd::Uninstall => {
+            let _ = process::Command::new("sc").args(["stop", &svc]).output();
+            let out = process::Command::new("sc").args(["delete", &svc]).output()?;
+            println!("{}", String::from_utf8_lossy(&out.stdout));
+        }
+        SvcCmd::Start => {
+            let out = process::Command::new("sc").args(["start", &svc]).output()?;
+            println!("{}", String::from_utf8_lossy(&out.stdout));
+        }
+        SvcCmd::Stop => {
+            let out = process::Command::new("sc").args(["stop", &svc]).output()?;
+            println!("{}", String::from_utf8_lossy(&out.stdout));
+        }
+        SvcCmd::Status => {
+            let out = process::Command::new("sc").args(["query", &svc]).output()?;
+            println!("{}", String::from_utf8_lossy(&out.stdout));
+        }
+    }
+    Ok(())
+}
