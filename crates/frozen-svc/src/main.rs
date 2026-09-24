@@ -89,6 +89,8 @@ fn load_flags(store: &db::Store) -> Flags {
         paused: false,
         pomodoro_phase: "off".into(),
         pomodoro_remaining_s: 0,
+        frozen_until: 0,
+        frozen_locked: false,
     }
 }
 
@@ -236,6 +238,14 @@ async fn handle_event(shared: &Shared, p: &serde_json::Value) {
                 c.store.record_domain(d, 0, false);
             }
         }
+        "frozen_stop" => {
+            drop(c);
+            let mut cw = shared.write().await;
+            let cred = p["credential"].as_str();
+            if let Err(e) = cw.try_frozen_stop(cred) {
+                warn!(err = %e, "frozen-stop refused");
+            }
+        }
         "tick" => {
             if let Some(d) = p["domain"].as_str() {
                 let secs = p["seconds"].as_i64().unwrap_or(5);
@@ -362,6 +372,7 @@ async fn tick_loop(shared: Shared) -> ! {
             last_proc_scan = Instant::now();
             enforce_processes(&shared).await;
             enforce_extension_health(&shared, &mut ext_grace).await;
+            enforce_frozen(&shared).await;
         }
     }
 }
@@ -425,6 +436,67 @@ async fn enforce_processes(shared: &Shared) {
                 break;
             }
         }
+    }
+}
+
+/// Frozen mode (spec §21): while the session is active every process not on
+/// the allowlist is killed on sight — browsers, task tools, everything.
+/// The overlay + explorer survive; the user can stare at a countdown or
+/// complete the exit ceremony, nothing else.
+async fn enforce_frozen(shared: &Shared) {
+    let (active, allow_apps) = {
+        let c = shared.read().await;
+        let extra = c
+            .store
+            .setting("frozen.allow_apps")
+            .map(|s| {
+                s.split(',')
+                    .map(|x| x.trim().to_lowercase())
+                    .filter(|x| !x.is_empty())
+                    .collect::<Vec<String>>()
+            })
+            .unwrap_or_default();
+        (c.frozen_active(), extra)
+    };
+    if !active {
+        return;
+    }
+    // OS processes the session can't live without, plus the pieces Frozen
+    // itself depends on (explorer renders the desktop under the overlay,
+    // our own binaries keep enforcing, user-explicit allow apps).
+    const SAFE: &[&str] = &[
+        "system", "registry", "smss.exe", "csrss.exe", "wininit.exe",
+        "winlogon.exe", "services.exe", "lsass.exe", "lsaiso.exe",
+        "svchost.exe", "dwm.exe", "explorer.exe", "sihost.exe",
+        "taskhostw.exe", "fontdrvhost.exe", "ctfmon.exe", "conhost.exe",
+        "dllhost.exe", "runtimebroker.exe", "shellexperiencehost.exe",
+        "searchhost.exe", "startmenuexperiencehost.exe", "textinputhost.exe",
+        "inputhost.exe", "securityhealthservice.exe", "securityhealthsystray.exe",
+        "frozen.exe", "frozen-svc.exe", "frozen-helper.exe", "frozen-nmh.exe",
+        "frozen-gui.exe", "wmiprvse.exe", "memory compression",
+        "msdtc.exe", "spoolsv.exe", "audiodg.exe", "wlanext.exe",
+    ];
+    let procs = match frozen_platform::list_processes() {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let mut killed = Vec::new();
+    for p in procs {
+        let name = p.name.to_lowercase();
+        if SAFE.contains(&name.as_str()) || allow_apps.contains(&name) {
+            continue;
+        }
+        if frozen_platform::kill_process(p.pid).is_ok() {
+            killed.push(p.name.clone());
+        }
+    }
+    if !killed.is_empty() {
+        let c = shared.read().await;
+        for name in &killed {
+            c.store.record_blocked("frozen", name);
+        }
+        c.store
+            .audit("svc", "frozen.kill", &killed.join(","));
     }
 }
 

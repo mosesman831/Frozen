@@ -213,6 +213,12 @@ pub struct Flags {
     pub paused: bool,
     pub pomodoro_phase: String,
     pub pomodoro_remaining_s: u64,
+    /// unix time the whole-computer lockout ends (0 = inactive)
+    #[serde(default)]
+    pub frozen_until: i64,
+    /// early exit needs a credential ceremony
+    #[serde(default)]
+    pub frozen_locked: bool,
 }
 
 impl Default for Flags {
@@ -227,6 +233,8 @@ impl Default for Flags {
             block_embedded: true,
             stats_strict: false,
             paused: false,
+            frozen_until: 0,
+            frozen_locked: false,
             pomodoro_phase: "off".into(),
             pomodoro_remaining_s: 0,
         }

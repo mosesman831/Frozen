@@ -108,6 +108,11 @@ enum Cmd {
         #[arg(long, default_value_t = 50)]
         last: i64,
     },
+    /// Frozen mode — whole-computer lockout
+    Frozen {
+        #[command(subcommand)]
+        action: FrozenCmd,
+    },
     /// Usage + blocked-attempt stats
     Stats {
         #[arg(long, default_value_t = 7)]
@@ -124,6 +129,30 @@ enum Cmd {
         #[arg(long, default_value = "{}")]
         params: String,
     },
+}
+
+#[derive(Subcommand)]
+enum FrozenCmd {
+    /// Lock the whole computer until the timer ends
+    Start {
+        /// duration e.g. 45s, 30m, 2h (alternative to --until)
+        #[arg(long)]
+        r#for: Option<String>,
+        /// unix timestamp the lockout ends (alternative to --for)
+        #[arg(long)]
+        until: Option<i64>,
+        /// early-exit ceremony: none|password|random
+        #[arg(long, default_value = "none")]
+        lock: String,
+        /// ceremony arg: password text or random-text length
+        #[arg(long)]
+        arg: Option<String>,
+    },
+    /// End the lockout early (credential if one was set)
+    Stop {
+        credential: Option<String>,
+    },
+    Status,
 }
 
 #[derive(Subcommand)]
@@ -200,6 +229,32 @@ async fn main() -> Result<()> {
         }
         Cmd::Audit { last } => ("audit", json!({"last": last})),
         Cmd::Stats { days } => ("stats", json!({"days": days})),
+        Cmd::Frozen { action } => match action {
+            FrozenCmd::Status => ("frozen-status", json!({})),
+            FrozenCmd::Stop { credential } => (
+                "frozen-stop",
+                json!({"credential": credential.clone().unwrap_or_default()}),
+            ),
+            FrozenCmd::Start { r#for, until, lock, arg } => {
+                let mut p = json!({});
+                if let Some(u) = until {
+                    p["until"] = json!(u);
+                } else {
+                    let secs = parse_duration(r#for.as_deref().unwrap_or("1h"))?;
+                    p["for_s"] = json!(secs);
+                }
+                let mut lk = json!({"type": lock});
+                if let Some(a) = arg {
+                    if lock == "password" {
+                        lk["password"] = json!(a);
+                    } else if lock == "random" {
+                        lk["len"] = json!(a.parse::<u64>().unwrap_or(50));
+                    }
+                }
+                p["lock"] = lk;
+                ("frozen-start", p)
+            }
+        },
         Cmd::Rpc { method, params } => {
             let m = method.as_str();
             let p: Value = serde_json::from_str(params).context("params must be JSON")?;
@@ -288,6 +343,19 @@ async fn rpc(method: &str, params: Value) -> Result<Value> {
     }
 }
 
+fn parse_duration(s: &str) -> Result<u64> {
+    let (n, mult) = if let Some(v) = s.strip_suffix('h') {
+        (v, 3600)
+    } else if let Some(v) = s.strip_suffix('m') {
+        (v, 60)
+    } else if let Some(v) = s.strip_suffix('d') {
+        (v, 86400)
+    } else {
+        (s.trim_end_matches('s'), 1)
+    };
+    Ok(n.trim().parse::<u64>().context("bad duration, e.g. 30m/2h")? * mult)
+}
+
 fn fmt_dur(s: i64) -> String {
     if s >= 3600 {
         format!("{}h{:02}m", s / 3600, (s % 3600) / 60)
@@ -360,6 +428,22 @@ fn print_human(method: &str, v: &Value) {
                         r["action"].as_str().unwrap_or(""),
                         r["detail"].as_str().unwrap_or(""));
                 }
+            }
+        }
+        "frozen-status" | "frozen_status" => {
+            if v["active"].as_bool() == Some(true) {
+                println!("FROZEN  remaining {}  locked={}",
+                    fmt_dur(v["remaining"].as_i64().unwrap_or(0)),
+                    v["locked"].as_bool().unwrap_or(false));
+            } else {
+                println!("not frozen");
+            }
+        }
+        "frozen-start" | "frozen_start" => {
+            if let Some(g) = v["generated"].as_str() {
+                println!("computer frozen. Type this text to end early (shown once):\n\n  {g}\n");
+            } else {
+                println!("computer frozen until {}", v["until"].as_i64().unwrap_or(0));
             }
         }
         "stats" => {

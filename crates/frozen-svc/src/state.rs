@@ -112,6 +112,10 @@ pub struct Core {
     pub boot_epoch: i64,
     /// last seen foreground window (exe path, title) — for app allowances
     pub last_fg: Option<(String, String)>,
+    /// unix time the whole-computer lockout ends (0 = inactive; spec §21)
+    pub frozen_until: i64,
+    /// argon2id hash gating early exit (None = no ceremony)
+    pub frozen_lock_hash: Option<String>,
     pub clients: HashMap<u64, ClientInfo>,
     pub next_client_id: u64,
 }
@@ -157,6 +161,8 @@ impl Core {
             pause_used: (today(), 0),
             boot_epoch: boot_epoch(),
             last_fg: None,
+            frozen_until: 0,
+            frozen_lock_hash: None,
             store,
             blocks,
             flags: Flags::default(),
@@ -181,8 +187,79 @@ impl Core {
                 }
             }
         }
+        // restore a frozen session that survives the service restart
+        if let Some(s) = c.store.setting("frozen.session") {
+            let mut it = s.splitn(2, '|');
+            if let Some(u) = it.next().and_then(|v| v.parse::<i64>().ok()) {
+                if u > chrono::Local::now().timestamp() {
+                    c.frozen_until = u;
+                    c.frozen_lock_hash = it
+                        .next()
+                        .map(String::from)
+                        .filter(|h| !h.is_empty());
+                }
+            }
+        }
         c.resolve_active();
         c
+    }
+
+    pub fn frozen_active(&self) -> bool {
+        self.frozen_until > chrono::Local::now().timestamp()
+    }
+
+    /// Attempt to end the frozen session early. `credential` is required when
+    /// the session was started with a ceremony lock. Rate-limits failures.
+    /// Returns Err(reason) on refusal.
+    pub fn try_frozen_stop(&mut self, credential: Option<&str>) -> Result<(), String> {
+        if !self.frozen_active() {
+            return Ok(());
+        }
+        let now = chrono::Local::now().timestamp();
+        let (tries, lockout) = self.unlock_fails.get("frozen").copied().unwrap_or((0, 0));
+        if tries >= 5 && now < lockout {
+            return Err(format!("LOCKED: too many failed attempts ({}s)", lockout - now));
+        }
+        if let Some(hash) = self.frozen_lock_hash.clone() {
+            let cred = credential.ok_or_else(|| "credential required".to_string())?;
+            let ok = {
+                use argon2::password_hash::{PasswordHash, PasswordVerifier};
+                match PasswordHash::new(&hash) {
+                    Ok(h) => argon2::Argon2::default()
+                        .verify_password(cred.as_bytes(), &h)
+                        .is_ok(),
+                    Err(_) => false,
+                }
+            };
+            if !ok {
+                let tries = tries + 1;
+                let lockout = if tries >= 5 {
+                    now + 60 * (1i64 << (tries - 5).min(6))
+                } else {
+                    0
+                };
+                self.unlock_fails.insert("frozen".into(), (tries, lockout));
+                let _ = self.store.audit("svc", "frozen.stop.fail", "");
+                return Err("INVALID: wrong credential".into());
+            }
+        }
+        self.frozen_until = 0;
+        self.frozen_lock_hash = None;
+        self.persist_frozen();
+        self.bump_rev();
+        let _ = self.store.audit("svc", "frozen.stop", "");
+        Ok(())
+    }
+
+    pub fn persist_frozen(&self) {
+        let _ = self.store.set_setting(
+            "frozen.session",
+            &format!(
+                "{}|{}",
+                self.frozen_until,
+                self.frozen_lock_hash.clone().unwrap_or_default()
+            ),
+        );
     }
 
     pub fn persist_pomodoro(&self) {
@@ -200,6 +277,8 @@ impl Core {
         flags.paused = self.paused;
         flags.pomodoro_phase = self.pomodoro.phase.clone();
         flags.pomodoro_remaining_s = self.pomodoro.remaining(chrono::Local::now().timestamp());
+        flags.frozen_until = if self.frozen_active() { self.frozen_until } else { 0 };
+        flags.frozen_locked = self.frozen_lock_hash.is_some();
         BlockListInfo { rev: self.rev, blocks: self.blocks.clone(), flags }
     }
 
@@ -397,6 +476,20 @@ impl Core {
             if cleared {
                 self.bump_rev();
             }
+        }
+
+        // ── frozen session expiry ────────────────────────────────────
+        if self.frozen_until > 0 && now >= self.frozen_until {
+            self.frozen_until = 0;
+            self.frozen_lock_hash = None;
+            self.persist_frozen();
+            ev.push(EngineEvent::Audit { action: "frozen.end", detail: String::new() });
+            ev.push(EngineEvent::Notify {
+                kind: "info",
+                title: "Frozen over".into(),
+                text: "The computer is usable again".into(),
+            });
+            self.bump_rev();
         }
 
         // ── restart locks: clear on detected reboot ───────────────────

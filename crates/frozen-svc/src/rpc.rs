@@ -31,6 +31,9 @@ pub async fn dispatch(shared: &Shared, method: &str, params: &Value) -> Result<V
         "end-break" | "end_break" => end_break(shared, params).await,
         "audit" => audit(shared, params).await,
         "stats" => stats(shared, params).await,
+        "frozen-start" | "frozen_start" => frozen_start(shared, params).await,
+        "frozen-stop" | "frozen_stop" => frozen_stop(shared, params).await,
+        "frozen-status" | "frozen_status" => frozen_status_rpc(shared).await,
         "set-setting" | "set_setting" => set_setting(shared, params).await,
         "get-setting" | "get_setting" => get_setting(shared, params).await,
         _ => Err(anyhow::anyhow!("unknown rpc: {method}")),
@@ -593,6 +596,69 @@ async fn end_break(shared: &Shared, p: &Value) -> Result<Value> {
         c.bump_rev();
     }
     Ok(json!({ "ok": true }))
+}
+
+async fn frozen_start(shared: &Shared, p: &Value) -> Result<Value> {
+    let now = chrono::Local::now().timestamp();
+    let until = if let Some(u) = p["until"].as_i64() {
+        u
+    } else {
+        now + p["for_s"].as_u64().unwrap_or(3600).clamp(60, 30 * 86400) as i64
+    };
+    let mut c = shared.write().await;
+    if c.frozen_active() {
+        return Err(anyhow::anyhow!("INVALID: already frozen until {}", c.frozen_until));
+    }
+    // optional early-exit ceremony: none | password | random
+    let lock_type = p["lock"]["type"].as_str().unwrap_or("none");
+    let mut generated = Value::Null;
+    c.frozen_lock_hash = match lock_type {
+        "none" => None,
+        "password" => {
+            let pw = p["lock"]["password"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("password required"))?;
+            Some(hash_secret(pw)?)
+        }
+        "random" => {
+            let len = p["lock"]["len"].as_u64().unwrap_or(50).clamp(10, 500) as u32;
+            let text = gen_random_text(len);
+            generated = json!(text);
+            Some(hash_secret(&text)?)
+        }
+        _ => return Err(anyhow::anyhow!("lock type: none|password|random")),
+    };
+    c.frozen_until = until;
+    c.persist_frozen();
+    c.bump_rev();
+    c.store.audit("rpc", "frozen.start", &format!("until={until} lock={lock_type}"));
+    drop(c);
+    crate::notify(
+        shared,
+        "block",
+        "Frozen mode",
+        "The computer is locked until the timer ends",
+    )
+    .await;
+    Ok(json!({ "ok": true, "until": until, "generated": generated }))
+}
+
+async fn frozen_stop(shared: &Shared, p: &Value) -> Result<Value> {
+    let mut c = shared.write().await;
+    c.try_frozen_stop(p["credential"].as_str())
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    Ok(json!({ "ok": true, "active": c.frozen_active() }))
+}
+
+async fn frozen_status_rpc(shared: &Shared) -> Result<Value> {
+    let c = shared.read().await;
+    let now = chrono::Local::now().timestamp();
+    Ok(json!({
+        "active": c.frozen_active(),
+        "until": c.frozen_until,
+        "remaining": (c.frozen_until - now).max(0),
+        "locked": c.frozen_lock_hash.is_some(),
+    }))
 }
 
 async fn stats(shared: &Shared, p: &Value) -> Result<Value> {

@@ -1,6 +1,8 @@
 //! frozen-helper — per-user agent: foreground sensor, watchdog heartbeat,
 //! notification sink. Tray UI is a later milestone; this runs headless.
 
+mod overlay;
+
 use anyhow::Result;
 use frozen_common::pipe::{read_env, win, write_env};
 use frozen_common::proto::*;
@@ -41,6 +43,23 @@ async fn run() -> Result<()> {
     write_env(&mut wr, &Envelope::new(op::HELLO, serde_json::to_value(hello)?)).await?;
 
     let (evt_tx, mut evt_rx) = tokio::sync::mpsc::unbounded_channel::<Envelope>();
+
+    // frozen-mode credential channel: overlay -> frozen_stop event
+    let (stop_tx, mut stop_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    {
+        let tx = evt_tx.clone();
+        tokio::spawn(async move {
+            while let Some(cred) = stop_rx.recv().await {
+                let env = Envelope::new(
+                    op::EVENT,
+                    json!({"type": "frozen_stop", "credential": cred}),
+                );
+                if tx.send(env).is_err() {
+                    return;
+                }
+            }
+        });
+    }
 
     // foreground sensor — blocking Win32 on a dedicated thread
     {
@@ -95,6 +114,12 @@ async fn run() -> Result<()> {
                     op::STATE => {
                         let info: BlockListInfo = serde_json::from_value(env.payload)?;
                         info!(rev = info.rev, blocks = info.blocks.len(), "state");
+                        let fu = info.flags.frozen_until;
+                        if fu > chrono::Local::now().timestamp() {
+                            overlay::set_active(fu, info.flags.frozen_locked, stop_tx.clone());
+                        } else {
+                            overlay::clear();
+                        }
                     }
                     op::NOTIFY => {
                         let n: Notify = serde_json::from_value(env.payload)?;
