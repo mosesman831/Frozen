@@ -495,9 +495,10 @@ fn service_cmd(action: SvcCmd) -> Result<()> {
                 .parent()
                 .unwrap()
                 .join("frozen-svc.exe");
+            let binpath = format!("\"{}\" --service", exe.display());
             let out = process::Command::new("sc")
                 .args(["create", &svc, "binpath="])
-                .arg(exe)
+                .arg(binpath)
                 .args(["start=", "auto"])
                 .output()?;
             println!("{}", String::from_utf8_lossy(&out.stdout));

@@ -19,6 +19,11 @@ use tokio::task::LocalSet;
 use tracing::{info, warn};
 
 fn main() -> Result<()> {
+    // real SCM service mode (installer / `sc start`): when spawned by the
+    // Service Control Manager we must enter the dispatcher immediately.
+    if std::env::args().any(|a| a == "--service") {
+        return service_mode();
+    }
     init_logging();
     // current_thread + LocalSet: rusqlite connections are !Sync, and this
     // event loop doesn't need multi-threaded throughput
@@ -26,6 +31,73 @@ fn main() -> Result<()> {
         .enable_all()
         .build()?;
     rt.block_on(async_main())
+}
+
+// ---- Windows service entry ----
+
+windows_service::define_windows_service!(ffi_service_main, service_main_wrapper);
+
+fn service_mode() -> Result<()> {
+    use windows_service::service_dispatcher;
+    service_dispatcher::start("FrozenSvc", ffi_service_main)
+        .map_err(|e| anyhow::anyhow!("service dispatcher: {e}"))
+}
+
+fn service_main_wrapper(_args: Vec<std::ffi::OsString>) {
+    use windows_service::service::{
+        ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState,
+        ServiceStatus, ServiceType,
+    };
+    use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
+
+    init_logging();
+    let (stop_tx, stop_rx) = std::sync::mpsc::channel::<()>();
+    let handle = match service_control_handler::register("FrozenSvc", move |event| {
+        match event {
+            ServiceControl::Stop => {
+                let _ = stop_tx.send(());
+                ServiceControlHandlerResult::NoError
+            }
+            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+            _ => ServiceControlHandlerResult::NotImplemented,
+        }
+    }) {
+        Ok(h) => h,
+        Err(e) => {
+            warn!(err = %e, "scm handler register failed");
+            return;
+        }
+    };
+
+    let report = |state: ServiceState| {
+        let _ = handle.set_service_status(ServiceStatus {
+            service_type: ServiceType::OWN_PROCESS,
+            current_state: state,
+            controls_accepted: if state == ServiceState::Running {
+                ServiceControlAccept::STOP
+            } else {
+                ServiceControlAccept::empty()
+            },
+            exit_code: ServiceExitCode::Win32(0),
+            checkpoint: 0,
+            wait_hint: std::time::Duration::from_secs(10),
+            process_id: None,
+        });
+    };
+    report(ServiceState::Running);
+
+    // run the app on a worker thread; main thread waits for SCM Stop.
+    // On stop: exit the process — all state is persisted continuously, so
+    // pipes closing is the only effect (clients reconnect).
+    let _worker = std::thread::spawn(|| {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+        rt.block_on(async_main())
+    });
+    let _ = stop_rx.recv();
+    report(ServiceState::Stopped);
+    std::process::exit(0);
 }
 
 async fn async_main() -> Result<()> {

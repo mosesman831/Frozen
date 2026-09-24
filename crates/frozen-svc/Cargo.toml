@@ -25,3 +25,6 @@ sha2 = { workspace = true }
 hmac = { workspace = true }
 argon2 = { workspace = true }
 windows = { workspace = true }
+
+[target.x86_64-pc-windows-gnu.dependencies]
+windows-service = "0.7.0"

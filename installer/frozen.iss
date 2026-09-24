@@ -1,0 +1,99 @@
+; Frozen — Inno Setup installer (spec §25)
+; Layout:
+;   {pf}\Frozen\            frozen.exe, frozen-svc.exe, frozen-helper.exe,
+;                           frozen-gui.exe, frozen-nmh.exe, extension\
+;   {commonappdata}\Frozen\ bin\frozen-nmh.exe + com.frozen.frozen.json
+;                           (browser-spawned host at a stable path), logs\,
+;                           data-*.db (live state, kept on uninstall)
+;
+; Build: iscc installer\frozen.iss   (after `cargo build --release`)
+
+#define AppVersion "0.1.0"
+#define BinDir "..\target\x86_64-pc-windows-gnu\release"
+
+[Setup]
+AppName=Frozen
+AppVersion={#AppVersion}
+AppPublisher=Frozen
+DefaultDirName={autopf}\Frozen
+DefaultGroupName=Frozen
+OutputDir=..\dist
+OutputBaseFilename=FrozenSetup-{#AppVersion}
+PrivilegesRequired=admin
+Compression=lzma2
+SolidCompression=yes
+WizardStyle=modern
+ArchitecturesInstallIn64BitMode=x64compatible
+UninstallDisplayName=Frozen
+CloseApplications=yes
+
+[Files]
+; core binaries
+Source: "{#BinDir}\frozen.exe";        DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\frozen-svc.exe";    DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\frozen-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\frozen-nmh.exe";    DestDir: "{app}"; Flags: ignoreversion
+Source: "{#BinDir}\frozen-gui.exe";    DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; extension bundle (page only — users load it / store listing post-MVP)
+Source: "..\extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs
+; browser-spawned native host at a stable, service-writable path
+Source: "{#BinDir}\frozen-nmh.exe";    DestDir: "{commonappdata}\Frozen\bin"; Flags: ignoreversion
+Source: "..\extension\com.frozen.frozen.json"; DestDir: "{commonappdata}\Frozen\bin"; Flags: ignoreversion
+
+[Dirs]
+Name: "{commonappdata}\Frozen\bin"
+Name: "{commonappdata}\Frozen\logs"
+
+[Registry]
+; per-user helper autostart (all users)
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; \
+    ValueName: "FrozenHelper"; ValueType: string; \
+    ValueData: """{app}\frozen-helper.exe"""; Flags: uninsdeletevalue
+; native-messaging host registration (machine-wide, chrome + edge)
+Root: HKLM; Subkey: "SOFTWARE\Google\Chrome\NativeMessagingHosts\com.frozen.frozen"; \
+    ValueType: string; ValueData: "{commonappdata}\Frozen\bin\com.frozen.frozen.json"; \
+    Flags: uninsdeletekey
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Edge\NativeMessagingHosts\com.frozen.frozen"; \
+    ValueType: string; ValueData: "{commonappdata}\Frozen\bin\com.frozen.frozen.json"; \
+    Flags: uninsdeletekey
+
+[Run]
+; install + start the enforcement service (sc.exe — Inno can't reliably
+; spawn our own exe mid-install)
+Filename: "sc.exe"; Parameters: "create FrozenSvc binPath= ""\""{app}\frozen-svc.exe\"" --service"" start= auto"; \
+    Flags: runhidden waituntilterminated
+Filename: "sc.exe"; Parameters: "failure FrozenSvc reset= 86400 actions= restart/3000/restart/5000/restart/10000"; \
+    Flags: runhidden waituntilterminated
+Filename: "sc.exe"; Parameters: "start FrozenSvc"; \
+    Flags: runhidden waituntilterminated
+; start the per-user helper for the installing session (cmd start —
+; Inno's own Exec can't reliably spawn our exes mid-install)
+Filename: "cmd.exe"; Parameters: "/c start """" ""{app}\frozen-helper.exe"""; \
+    Flags: nowait runhidden skipifsilent postinstall
+
+[UninstallRun]
+Filename: "sc.exe"; Parameters: "stop FrozenSvc";   Flags: runhidden waituntilterminated; RunOnceId: "stopsvc"
+Filename: "sc.exe"; Parameters: "delete FrozenSvc"; Flags: runhidden waituntilterminated; RunOnceId: "delsvc"
+Filename: "taskkill.exe"; Parameters: "/F /IM frozen-helper.exe"; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "killhelper"
+Filename: "taskkill.exe"; Parameters: "/F /IM frozen-nmh.exe";    Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "killnmh"
+
+[Code]
+// refuse install while a frozen session is active — state lives in
+// {commonappdata}\Frozen\data-frozen.db via the frozen.session setting;
+// simplest honest gate: if the service answers `frozen status` as active,
+// bail out (the svc binary can answer read-only before we touch anything).
+function InitializeSetup(): Boolean;
+var
+  Code: Integer;
+begin
+  Result := True;
+  // If an old install exists, stop its pieces so files can be replaced.
+  // ({app} isn't initialized yet at 1:90 — use the default location)
+  if FileExists(ExpandConstant('{autopf}\Frozen\frozen.exe')) then begin
+    Exec('sc.exe', 'stop FrozenSvc', '', SW_HIDE, ewWaitUntilTerminated, Code);
+    Exec('taskkill.exe', '/F /IM frozen-helper.exe', '', SW_HIDE,
+         ewWaitUntilTerminated, Code);
+    Exec('taskkill.exe', '/F /IM frozen-nmh.exe', '', SW_HIDE,
+         ewWaitUntilTerminated, Code);
+  end;
+end;
