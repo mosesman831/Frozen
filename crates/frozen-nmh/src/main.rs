@@ -68,6 +68,7 @@ async fn run() -> Result<()> {
     let browser = std::env::args()
         .skip_while(|a| a != "--browser")
         .nth(1)
+        .or_else(|| frozen_platform::detect_browser())
         .unwrap_or_else(|| "chrome".into());
     info!(browser = %browser, pid = process::id(), "nmh starting");
 

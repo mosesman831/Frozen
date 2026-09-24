@@ -51,6 +51,72 @@ pub fn list_processes() -> Result<Vec<ProcInfo>> {
     }
 }
 
+/// Which browser spawned this process — walks up to 4 parents looking for a
+/// known browser image name. Used by frozen-nmh since a native-messaging
+/// manifest `path` cannot carry arguments.
+pub fn detect_browser() -> Option<String> {
+    let mut pid = std::process::id();
+    for _ in 0..4 {
+        let (ppid, name) = parent_of(pid)?;
+        if ppid == 0 || ppid == pid {
+            return None;
+        }
+        let n = name.to_lowercase();
+        let known = match n.as_str() {
+            "chrome.exe" => Some("chrome"),
+            "msedge.exe" => Some("edge"),
+            "firefox.exe" => Some("firefox"),
+            "brave.exe" => Some("brave"),
+            _ => None,
+        };
+        if let Some(b) = known {
+            return Some(b.to_string());
+        }
+        pid = ppid;
+    }
+    None
+}
+
+/// (ppid, image name) of the parent of `pid`.
+fn parent_of(pid: u32) -> Option<(u32, String)> {
+    unsafe {
+        let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).ok()?;
+        let mut pe = PROCESSENTRY32W::default();
+        pe.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        let mut ppid = 0u32;
+        if Process32FirstW(snap, &mut pe).is_ok() {
+            loop {
+                if pe.th32ProcessID == pid {
+                    ppid = pe.th32ParentProcessID;
+                    break;
+                }
+                if Process32NextW(snap, &mut pe).is_err() {
+                    break;
+                }
+            }
+        }
+        if ppid == 0 {
+            let _ = CloseHandle(snap);
+            return None;
+        }
+        pe.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        let mut name = String::new();
+        if Process32FirstW(snap, &mut pe).is_ok() {
+            loop {
+                if pe.th32ProcessID == ppid {
+                    name = pwstr_to_string(&pe.szExeFile);
+                    break;
+                }
+                if Process32NextW(snap, &mut pe).is_err() {
+                    break;
+                }
+            }
+        }
+        let _ = CloseHandle(snap);
+        Some((ppid, name))
+    }
+}
+
 /// Full image path of a process (empty string if access denied / exited).
 pub fn process_path(pid: u32) -> Result<String> {
     unsafe {

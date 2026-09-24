@@ -1,0 +1,9 @@
+{
+  "name": "com.frozen.frozen",
+  "description": "Frozen native messaging host",
+  "path": "C:\\Users\\Administrator\\repos\\frozen\\target\\x86_64-pc-windows-gnu\\debug\\frozen-nmh.exe",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://fhilkimakddiocfoeemgfjmbemcdcklm/"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Frozen",
+  "version": "0.1.0",
+  "description": "Frozen — system-level website & app blocker",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmzPMsrR/nrzaJZMGxUsFxgmBuaUq7fLiXi5x/b4tGfLnM+5WZmTSsXSJ/QRJXtv66n5B33kaSeZDTG4gvoqgRbE0W12xq5VH+re+kc8b8Ef1wx3CyeNlUKPmZyuhptAMN+kBuotZ2l2a4sFjDSGoxMw6+HGc5Eovzhm1Fi6di7N9072b/NB++qnyOYU+DN/tXJsnP4RmcJZmaTNDrOMoBeLrCu5Sfe06JAIDuPacFGz04botCzTPJpNZq5F0qoFyWbTP27wg4D8R8qD79MqErWOqF9y+0MwtEJUSrQ51s4Fx9pm+YJ3tgT5ss2+BeQxEKklvncrkdfcHS8bST0AHEQIDAQAB",
+  "minimum_chrome_version": "102",
+  "permissions": [
+    "nativeMessaging",
+    "webNavigation",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["rules.js", "content.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["blocked.html", "blocked.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
