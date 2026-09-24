@@ -290,6 +290,9 @@ async fn tick_loop(shared: Shared) -> ! {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     let mut last_rev = 0u64;
     let mut last_proc_scan = Instant::now() - Duration::from_secs(10);
+    // browser → seconds it has been running without its extension connected
+    let mut ext_grace: std::collections::HashMap<String, u64> =
+        std::collections::HashMap::new();
     loop {
         interval.tick().await;
         {
@@ -306,6 +309,7 @@ async fn tick_loop(shared: Shared) -> ! {
         if last_proc_scan.elapsed() >= Duration::from_secs(2) {
             last_proc_scan = Instant::now();
             enforce_processes(&shared).await;
+            enforce_extension_health(&shared, &mut ext_grace).await;
         }
     }
 }
@@ -368,6 +372,111 @@ async fn enforce_processes(shared: &Shared) {
                 .await;
                 break;
             }
+        }
+    }
+}
+
+/// Extension-health enforcement (CT's model): while ANY active block is
+/// locked, a running browser whose extension isn't connected gets a grace
+/// countdown, then is force-closed. Protected processes (Task Manager etc.)
+/// die immediately under the same gate.
+const EXT_GRACE_S: u64 = 60;
+
+async fn enforce_extension_health(
+    shared: &Shared,
+    grace: &mut std::collections::HashMap<String, u64>,
+) {
+    let locked = {
+        let c = shared.read().await;
+        c.blocks
+            .iter()
+            .any(|b| b.active && !matches!(b.lock, LockKind::None))
+    };
+    if !locked {
+        grace.clear();
+        return;
+    }
+
+    let procs = match frozen_platform::list_processes() {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+
+    // protected tooling: kill outright during locked blocks
+    const PROTECTED: &[&str] = &[
+        "taskmgr.exe",
+        "procexp.exe",
+        "procexp64.exe",
+        "processhacker.exe",
+        "perfmon.exe",
+        "resmon.exe",
+    ];
+    for p in &procs {
+        if PROTECTED.contains(&p.name.as_str()) {
+            let _ = frozen_platform::kill_process(p.pid);
+            let c = shared.read().await;
+            c.store.audit("svc", "protect.kill", &format!("{} ({})", p.name, p.pid));
+            drop(c);
+            notify(
+                shared,
+                "block",
+                "Protected application",
+                &format!("{} is not available during a locked block", p.name),
+            )
+            .await;
+        }
+    }
+
+    // browser extension health
+    const BROWSERS: &[(&str, &str)] = &[
+        ("chrome", "chrome.exe"),
+        ("edge", "msedge.exe"),
+        ("firefox", "firefox.exe"),
+        ("brave", "brave.exe"),
+    ];
+    for (bname, exe) in BROWSERS {
+        let running_pids: Vec<u32> = procs
+            .iter()
+            .filter(|p| p.name == *exe)
+            .map(|p| p.pid)
+            .collect();
+        if running_pids.is_empty() {
+            grace.remove(*bname);
+            continue;
+        }
+        let connected = {
+            let c = shared.read().await;
+            c.clients
+                .values()
+                .any(|ci| ci.kind == "nmh" && ci.browser.as_deref() == Some(*bname))
+        };
+        if connected {
+            grace.remove(*bname);
+            continue;
+        }
+        let elapsed = grace.entry((*bname).to_string()).or_insert(0);
+        *elapsed += 2;
+        if *elapsed == 10 || (*elapsed > 10 && *elapsed % 10 == 0 && *elapsed < EXT_GRACE_S) {
+            let remaining = EXT_GRACE_S - *elapsed;
+            notify(
+                shared,
+                "grace",
+                "Frozen extension required",
+                &format!(
+                    "The {bname} browser will close in {remaining}s — the Frozen extension must be re-enabled during a locked block"
+                ),
+            )
+            .await;
+        }
+        if *elapsed >= EXT_GRACE_S {
+            for pid in &running_pids {
+                let _ = frozen_platform::kill_process(*pid);
+            }
+            let c = shared.read().await;
+            c.store
+                .audit("svc", "ext.enforce", &format!("{bname} killed: extension absent"));
+            drop(c);
+            grace.remove(*bname);
         }
     }
 }
