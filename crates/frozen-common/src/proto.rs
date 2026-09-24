@@ -120,9 +120,17 @@ pub enum LockKind {
     None,
     Timer { until: i64 },
     Range { start_hm: String, end_hm: String },
+    /// argon2id hash of the unlock password
     Password { hash: String },
-    RandomText { len: u32, perfect: bool },
+    /// generated random text shown once at lock time; hash is argon2id
+    RandomText {
+        len: u32,
+        perfect: bool,
+        #[serde(default)]
+        hash: Option<String>,
+    },
     Restart,
+    /// daily budget of break seconds while locked (spec §14)
     Allowance { seconds: u64 },
     Enforced,
     Frozen,
@@ -179,6 +187,9 @@ pub struct BlockInfo {
     /// runtime-computed: whether this block is actively enforcing right now
     #[serde(default)]
     pub active: bool,
+    /// runtime-computed: unix time the active break ends (0/none = not on break)
+    #[serde(default)]
+    pub break_until: Option<i64>,
 }
 
 /// The state blob pushed to extensions/helpers (spec §11.3).

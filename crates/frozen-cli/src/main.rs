@@ -61,16 +61,47 @@ enum Cmd {
     Lock {
         block: String,
         kind: String,
-        /// timer: minutes | range: HH:MM-HH:MM | random: length[,perfect] | allowance: minutes
+        /// timer: minutes | range: HH:MM-HH:MM | password: secret | random: length[,perfect] | allowance: minutes
         #[arg(long)]
         arg: Option<String>,
     },
-    /// Pomodoro: status|start|stop
+    /// Unlock a password/random-locked block (prints a 5-min token)
+    Unlock { name: String, credential: String },
+    /// Start a break: <block> delay|random|cause
+    Break {
+        name: String,
+        kind: String,
+        /// delay-break wait seconds (default 120)
+        #[arg(long, default_value_t = 120)]
+        wait_s: u64,
+        /// break length in minutes (default 30)
+        #[arg(long, default_value_t = 30)]
+        duration_m: u64,
+        /// random-break text length (default 50)
+        #[arg(long, default_value_t = 50)]
+        len: u64,
+        /// random-break perfect mode
+        #[arg(long)]
+        perfect: bool,
+    },
+    /// Complete a random break: <challenge-id> <typed text>
+    BreakComplete { challenge: String, text: String },
+    /// End the active/pending break on a block
+    BreakEnd { name: String },
+    /// Pomodoro: status|start|skip|pause|resume|stop  (+ --preset classic|long|sprint|custom)
     Pomodoro {
         action: String,
-        /// work seconds (for start)
-        #[arg(long, default_value_t = 1500)]
-        work_s: u64,
+        #[arg(long)]
+        preset: Option<String>,
+        /// work seconds (custom preset)
+        #[arg(long)]
+        work_s: Option<u64>,
+        #[arg(long)]
+        short_s: Option<u64>,
+        #[arg(long)]
+        long_s: Option<u64>,
+        #[arg(long)]
+        cycles_per_long: Option<u64>,
     },
     /// Audit log tail
     Audit {
@@ -133,8 +164,34 @@ async fn main() -> Result<()> {
         Cmd::Pause => ("pause", json!({})),
         Cmd::Resume => ("resume", json!({})),
         Cmd::Lock { block, kind, arg } => ("lock", lock_params(block, kind, arg.as_deref())?),
-        Cmd::Pomodoro { action, work_s } => {
-            ("pomodoro", json!({"action": action, "work_s": work_s}))
+        Cmd::Unlock { name, credential } => {
+            ("unlock", json!({"name": name, "credential": credential}))
+        }
+        Cmd::Break { name, kind, wait_s, duration_m, len, perfect } => {
+            let m = match kind.as_str() {
+                "delay" => "start-delay-break",
+                "random" => "start-random-break",
+                "cause" => "start-cause-break",
+                _ => anyhow::bail!("break kind: delay|random|cause"),
+            };
+            (
+                m,
+                json!({"name": name, "wait_s": wait_s, "duration_m": duration_m,
+                       "len": len, "perfect": perfect}),
+            )
+        }
+        Cmd::BreakComplete { challenge, text } => {
+            ("complete-break", json!({"challenge": challenge, "text": text}))
+        }
+        Cmd::BreakEnd { name } => ("end-break", json!({"name": name})),
+        Cmd::Pomodoro { action, preset, work_s, short_s, long_s, cycles_per_long } => {
+            let mut pj = json!({"action": action});
+            if let Some(pr) = preset { pj["preset"] = json!(pr); }
+            if let Some(w) = work_s { pj["work_s"] = json!(w); }
+            if let Some(s) = short_s { pj["short_s"] = json!(s); }
+            if let Some(l) = long_s { pj["long_s"] = json!(l); }
+            if let Some(n) = cycles_per_long { pj["cycles_per_long"] = json!(n); }
+            ("pomodoro", pj)
         }
         Cmd::Audit { last } => ("audit", json!({"last": last})),
         Cmd::Rpc { method, params } => {
@@ -171,7 +228,8 @@ fn lock_params(block: &str, kind: &str, arg: Option<&str>) -> Result<Value> {
             let (s, e) = a.split_once('-').context("range needs HH:MM-HH:MM")?;
             json!({"type": "range", "start_hm": s, "end_hm": e})
         }
-        "password" => json!({"type": "password", "hash": arg.unwrap_or("")}),
+        // plaintext password — the service hashes it (argon2id)
+        "password" => json!({"type": "password", "password": arg.context("password needs --arg <secret>")?}),
         "random" => {
             let a = arg.unwrap_or("32");
             let (len, perfect) = match a.split_once(',') {
@@ -251,6 +309,28 @@ fn print_human(method: &str, v: &Value) {
                         b["lock"]["type"].as_str().unwrap_or("none"));
                 }
             }
+        }
+        "unlock" => {
+            if let Some(t) = v["token"].as_str() {
+                println!("unlock token: {t}  (valid {}s)", v["expires_in"].as_u64().unwrap_or(300));
+                println!("pass it with: --params '{{\"unlock_token\":\"{t}\"}}' via `frozen rpc`");
+            } else {
+                println!("{}", serde_json::to_string_pretty(v).unwrap_or_default());
+            }
+        }
+        "lock" => {
+            if let Some(g) = v["generated"].as_str() {
+                println!("block locked. Type this text to unlock (shown once):");
+                println!("\n  {g}\n");
+            } else {
+                println!("lock set");
+            }
+        }
+        "pomodoro" => {
+            println!("pomodoro: {}  remaining {}s  cycle {}",
+                v["phase"].as_str().unwrap_or("off"),
+                v["remaining"].as_u64().unwrap_or(0),
+                v["cycle"].as_u64().unwrap_or(0));
         }
         "audit" => {
             if let Some(rows) = v["audit"].as_array() {

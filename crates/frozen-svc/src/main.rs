@@ -167,7 +167,9 @@ async fn session(mut srv: NamedPipeServer, shared: Shared, pipe: String) -> Resu
                     }
                     op::FG_EVENT => {
                         let ev: FgEvent = serde_json::from_value(env.payload)?;
-                        shared.read().await.store.record_fg(&ev);
+                        let mut c = shared.write().await;
+                        c.store.record_fg(&ev);
+                        c.last_fg = Some((ev.path.clone(), ev.title.clone()));
                     }
                     op::EVENT => {
                         handle_event(&shared, &env.payload).await;
@@ -238,6 +240,29 @@ async fn handle_event(shared: &Shared, p: &serde_json::Value) {
             if let Some(d) = p["domain"].as_str() {
                 let secs = p["seconds"].as_i64().unwrap_or(5);
                 c.store.record_domain(d, secs, false);
+                drop(c);
+                // allowance engine: focused-domain seconds draw down quotas
+                let url = format!("https://{d}/");
+                let mut cw = shared.write().await;
+                let hit = cw.spend_allowance(secs as u64, |b| {
+                    let rules: Vec<(String, String, bool)> = b
+                        .rules
+                        .iter()
+                        .filter(|r| !r.negated)
+                        .filter(|r| !matches!(r.kind, RuleKind::App | RuleKind::Folder | RuleKind::Title))
+                        .map(|r| (frozen_common::rules::kind_name(&r.kind), r.value.clone(), false))
+                        .collect();
+                    !rules.is_empty() && frozen_common::rules::match_url(&url, &rules).is_some()
+                });
+                if let Some(ids) = hit {
+                    let names: Vec<String> = cw.blocks.iter()
+                        .filter(|b| ids.split(',').any(|i| i == b.id))
+                        .map(|b| b.name.clone()).collect();
+                    cw.store.audit("svc", "allowance.exhausted", &names.join(","));
+                    drop(cw);
+                    notify(shared, "block", "Allowance exhausted",
+                        &format!("{} — blocked for the rest of the day", names.join(", "))).await;
+                }
             }
         }
         _ => {}
@@ -295,9 +320,36 @@ async fn tick_loop(shared: Shared) -> ! {
         std::collections::HashMap::new();
     loop {
         interval.tick().await;
-        {
+        let evs = {
             let mut c = shared.write().await;
+            // foreground-app allowance: spend 1s into app/folder/title blocks
+            // whose rules match the current foreground process
+            if let Some((path, title)) = c.last_fg.clone() {
+                let titles = vec![title];
+                c.spend_allowance(1, |b| {
+                    let rules: Vec<(String, String, bool)> = b
+                        .rules
+                        .iter()
+                        .filter(|r| !r.negated)
+                        .filter(|r| matches!(r.kind, RuleKind::App | RuleKind::Folder | RuleKind::Title))
+                        .map(|r| (frozen_common::rules::kind_name(&r.kind), r.value.clone(), false))
+                        .collect();
+                    !rules.is_empty()
+                        && frozen_common::rules::match_process(&path, &titles, &rules).is_some()
+                });
+            }
             c.resolve_active();
+            c.tick_engines()
+        };
+        for ev in evs {
+            match ev {
+                state::EngineEvent::Notify { kind, title, text } => {
+                    notify(&shared, kind, &title, &text).await
+                }
+                state::EngineEvent::Audit { action, detail } => {
+                    shared.read().await.store.audit("svc", action, &detail)
+                }
+            }
         }
         let rev = shared.read().await.rev;
         if rev != last_rev {

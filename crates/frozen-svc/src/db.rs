@@ -288,6 +288,7 @@ impl Store {
                 pomodoro_phase: pp,
                 force_close: fc != 0,
                 active: false,
+                break_until: None,
             };
             if self.block_sig(&b) == sig {
                 out.push(b);
@@ -400,9 +401,10 @@ fn encode_lock(l: &LockKind) -> (&'static str, Option<String>) {
             ("range", Some(format!("{}|{}", start_hm, end_hm)))
         }
         LockKind::Password { hash } => ("password", Some(hash.clone())),
-        LockKind::RandomText { len, perfect } => {
-            ("random_text", Some(format!("{}|{}", len, perfect)))
-        }
+        LockKind::RandomText { len, perfect, hash } => (
+            "random_text",
+            Some(format!("{}|{}|{}", len, perfect, hash.clone().unwrap_or_default())),
+        ),
         LockKind::Restart => ("restart", None),
         LockKind::Allowance { seconds } => ("allowance", Some(seconds.to_string())),
         LockKind::Enforced => ("enforced", None),
@@ -426,10 +428,13 @@ fn decode_lock(kind: &str, param: Option<&str>) -> LockKind {
             hash: param.unwrap_or_default().into(),
         },
         "random_text" => {
-            let mut it = param.unwrap_or("100|false").splitn(2, '|');
+            let mut it = param.unwrap_or("100|false").splitn(3, '|');
             LockKind::RandomText {
                 len: it.next().and_then(|s| s.parse().ok()).unwrap_or(100),
                 perfect: it.next().map(|s| s == "true").unwrap_or(false),
+                hash: it.next().and_then(|s| {
+                    if s.is_empty() { None } else { Some(s.to_string()) }
+                }),
             }
         }
         "restart" => LockKind::Restart,
