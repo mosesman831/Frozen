@@ -46,18 +46,9 @@ fn main() -> Result<()> {
         rt.block_on(io_loop(rx, weak));
     });
 
-    // pre-load stats + audit once connected (io thread replays these on
-    // every reconnect too, so the tabs aren't empty on first visit)
-    let _ = tx.send(Req {
-        id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-        method: "stats".into(),
-        params: json!({"days": 7}),
-    });
-    let _ = tx.send(Req {
-        id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
-        method: "audit".into(),
-        params: json!({"last": 300}),
-    });
+    // pre-load stats + audit is sent inside connect_and_run after HELLO,
+    // so it replays on every (re)connect rather than being lost with the
+    // first connection's queue.
 
     let g = ui.global::<G>();
 
@@ -306,6 +297,21 @@ async fn connect_and_run(
 
     // pending requests map id -> method (for reply routing)
     let pending_methods: Mutex<HashMap<u64, String>> = Mutex::new(HashMap::new());
+
+    // preload stats + audit on this connection — writing them here (after
+    // HELLO) means a dropped/replaced connection replays them instead of
+    // silently losing the queue.
+    for (method, params) in [
+        ("stats", json!({"days": 7})),
+        ("audit", json!({"last": 300})),
+    ] {
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        pending_methods.lock().unwrap().insert(id, method.into());
+        let env = Envelope::req(op::RPC, id, json!({"method": method, "params": params}));
+        if write_env(&mut wr, &env).await.is_err() {
+            anyhow::bail!("pipe write failed");
+        }
+    }
 
     loop {
         tokio::select! {
