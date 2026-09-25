@@ -94,22 +94,22 @@ component Pill inherits Rectangle {
     background: root.bg;
     border-radius: root.height / 2;
     border-color: T.line;
-    border-width: 1px;
-    height: 20px;
+    border-width: 1.3px;
+    height: 25px;
     horizontal-stretch: 0;
     vertical-stretch: 0;
     lay := HorizontalLayout {
-        padding-left: 8px; padding-right: 9px; spacing: 5px; alignment: center;
+        padding-left: 10px; padding-right: 11.3px; spacing: 6.3px; alignment: center;
         if root.dot != transparent : Rectangle {
-            width: 5px; height: 5px; border-radius: 2.5px; y: 0px;
+            width: 6.3px; height: 6.3px; border-radius: 3.1px; y: 0px;
             background: root.dot;
         }
         Text {
             text: root.label;
             color: root.fg;
-            font-size: 9px;
+            font-size: 11.3px;
             font-weight: 700;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.8px;
             vertical-alignment: center;
         }
     }
@@ -122,11 +122,11 @@ component Btn inherits Rectangle {
     in property <bool> danger: false;
     in property <bool> primary: false;
     callback clicked();
-    height: 32px;
+    height: 40px;
     horizontal-stretch: 0;
-    width: max(48px, bt.preferred-width + 22px);
-    border-radius: 8px;
-    border-width: root.primary ? 0px : 1px;
+    width: max(60px, bt.preferred-width + 27.5px);
+    border-radius: 10px;
+    border-width: root.primary ? 0px : 1.3px;
     border-color: root.danger ? #5c2340 : T.line;
     background: root.primary
         ? (ta.pressed ? @linear-gradient(120deg, #e8893f, #e8476f) : T.grad)
@@ -141,9 +141,9 @@ component Btn inherits Rectangle {
     bt := Text {
         text: root.label;
         color: root.primary ? #ffffff : root.danger ? T.danger : root.fg;
-        font-size: 11px;
+        font-size: 13.8px;
         font-weight: 600;
-        letter-spacing: 0.4px;
+        letter-spacing: 0.5px;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -151,35 +151,36 @@ component Btn inherits Rectangle {
 
 component Card inherits Rectangle {
     background: T.panel;
-    border-radius: 14px;
+    border-radius: 17.5px;
     border-color: T.line;
-    border-width: 1px;
+    border-width: 1.3px;
 }
 
 component Field inherits Rectangle {
     in-out property <string> text <=> inp.text;
     in property <string> placeholder-text: "";
-    height: 32px;
-    border-radius: 8px;
+    height: 40px;
+    min-width: 80px;
+    border-radius: 10px;
     background: T.input;
     border-color: inp.has-focus ? T.violet : T.line;
-    border-width: 1px;
+    border-width: 1.3px;
     inp := TextInput {
-        x: 10px;
-        width: parent.width - 20px;
+        x: 12.5px;
+        width: parent.width - 25px;
         height: parent.height;
         vertical-alignment: center;
         color: T.txt;
-        font-size: 12px;
+        font-size: 15px;
         selection-background-color: T.violet.with-alpha(0.5);
         selection-foreground-color: #ffffff;
     }
     if inp.text == "" : Text {
-        x: 10px;
+        x: 12.5px;
         height: parent.height;
         text: root.placeholder-text;
         color: T.faint;
-        font-size: 12px;
+        font-size: 15px;
         vertical-alignment: center;
     }
     TouchArea { clicked => { inp.focus(); } }
@@ -189,51 +190,51 @@ component Pick inherits Rectangle {
     in property <[string]> model: [];
     in-out property <int> current-index: 0;
     out property <string> current-value: root.model.length > 0 && root.current-index < root.model.length ? root.model[root.current-index] : "";
-    height: 32px;
-    border-radius: 8px;
+    height: 40px;
+    border-radius: 10px;
     background: T.input;
     border-color: T.line;
-    border-width: 1px;
+    border-width: 1.3px;
     HorizontalLayout {
-        padding-left: 10px; padding-right: 8px;
+        padding-left: 12.5px; padding-right: 10px;
         Text {
             text: root.current-value == "" ? "…" : root.current-value;
             color: root.current-value == "" ? T.faint : T.txt;
-            font-size: 12px;
+            font-size: 15px;
             vertical-alignment: center;
             overflow: elide;
         }
-        Text { text: "▾"; color: T.mut; font-size: 11px; vertical-alignment: center; }
+        Text { text: "▾"; color: T.mut; font-size: 13.8px; vertical-alignment: center; }
     }
     ta := TouchArea {
         mouse-cursor: pointer;
         clicked => { pop.show(); }
     }
     pop := PopupWindow {
-        x: 0; y: parent.height + 4px;
-        width: max(root.width, 140px);
+        x: 0; y: parent.height + 5px;
+        width: max(root.width, 175px);
         Rectangle {
             background: T.panel-2;
-            border-radius: 10px;
+            border-radius: 12.5px;
             border-color: T.line;
-            border-width: 1px;
-            drop-shadow-blur: 18px;
+            border-width: 1.3px;
+            drop-shadow-blur: 22.5px;
             drop-shadow-color: #00000080;
             VerticalLayout {
-                padding: 5px;
-                spacing: 1px;
+                padding: 6.3px;
+                spacing: 1.3px;
                 for it[idx] in root.model : Rectangle {
-                    height: 30px;
-                    border-radius: 7px;
+                    height: 37.5px;
+                    border-radius: 8.8px;
                     background: idx == root.current-index ? T.violet.with-alpha(0.22) : (row_ta.has-hover ? T.panel : transparent);
                     row_ta := TouchArea {
                         mouse-cursor: pointer;
                         clicked => { root.current-index = idx; pop.close(); }
                     }
                     Text {
-                        text: it; x: 10px;
+                        text: it; x: 12.5px;
                         color: idx == root.current-index ? T.txt : T.mut;
-                        font-size: 12px;
+                        font-size: 15px;
                         vertical-alignment: center;
                         font-weight: idx == root.current-index ? 700 : 400;
                     }
@@ -245,9 +246,9 @@ component Pick inherits Rectangle {
 
 component SectionLabel inherits Text {
     color: T.faint;
-    font-size: 9px;
+    font-size: 11.3px;
     font-weight: 800;
-    letter-spacing: 1.4px;
+    letter-spacing: 1.8px;
 }
 
 component StatCard inherits Card {
@@ -255,20 +256,20 @@ component StatCard inherits Card {
     in property <string> value;
     in property <string> sub: "";
     in property <color> icon: T.violet;
-    height: 96px;
+    height: 120px;
     HorizontalLayout {
-        padding: 16px; spacing: 10px;
+        padding: 20px; spacing: 12.5px;
         VerticalLayout {
-            spacing: 3px; alignment: center;
-            Text { text: root.label; color: T.faint; font-size: 9px; font-weight: 800; letter-spacing: 1.4px; }
-            Text { text: root.value; color: T.txt; font-size: 30px; font-weight: 800; }
-            if root.sub != "" : Text { text: root.sub; color: T.mut; font-size: 10px; }
+            spacing: 3.8px; alignment: center;
+            Text { text: root.label; color: T.faint; font-size: 11.3px; font-weight: 800; letter-spacing: 1.8px; }
+            Text { text: root.value; color: T.txt; font-size: 37.5px; font-weight: 800; }
+            if root.sub != "" : Text { text: root.sub; color: T.mut; font-size: 12.5px; }
         }
         Rectangle {}
         Rectangle {
-            width: 36px; height: 36px; border-radius: 10px;
+            width: 45px; height: 45px; border-radius: 12.5px;
             background: root.icon.with-alpha(0.16);
-            Text { text: "◆"; color: root.icon; font-size: 14px;
+            Text { text: "◆"; color: root.icon; font-size: 17.5px;
                 horizontal-alignment: center; vertical-alignment: center; }
         }
     }
@@ -278,8 +279,8 @@ component StatCard inherits Card {
 
 export component AppWindow inherits Window {
     title: "Frozen";
-    min-width: 1000px;
-    min-height: 680px;
+    min-width: 1250px;
+    min-height: 850px;
     background: @linear-gradient(160deg, #171130 0%, #140f28 45%, #100c22 100%);
     default-font-family: "Segoe UI";
     property <int> page: 0;
@@ -298,17 +299,17 @@ export component AppWindow inherits Window {
 
     // error / toast bar
     if G.last_error != "" || G.toast != "" : Rectangle {
-        y: 10px; height: 34px; width: parent.width - 40px;
-        x: 20px;
+        y: 12.5px; height: 42.5px; width: parent.width - 50px;
+        x: 25px;
         z: 99;
-        border-radius: 10px;
+        border-radius: 12.5px;
         background: G.last_error != "" ? #4a1a30 : #173a2a;
         border-color: G.last_error != "" ? T.danger : T.green;
-        border-width: 1px;
+        border-width: 1.3px;
         Text {
-            x: 14px;
+            x: 17.5px;
             text: G.last_error != "" ? ("⚠  " + G.last_error) : G.toast;
-            color: G.last_error != "" ? #ffb3c2 : #8ff0b3; font-size: 12px;
+            color: G.last_error != "" ? #ffb3c2 : #8ff0b3; font-size: 15px;
             font-weight: 600; vertical-alignment: center;
         }
     }
@@ -318,24 +319,24 @@ export component AppWindow inherits Window {
         z: 100;
         background: #0a0618ee;
         Card {
-            width: 560px; height: 320px;
+            width: 700px; height: 400px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             border-color: T.violet;
             VerticalLayout {
-                padding: 22px; spacing: 12px;
-                Text { text: "RANDOM-TEXT BREAK"; color: T.violet; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
-                Text { text: "Type this exactly to start the break:"; color: T.mut; font-size: 12px; }
+                padding: 27.5px; spacing: 15px;
+                Text { text: "RANDOM-TEXT BREAK"; color: T.violet; font-size: 12.5px; font-weight: 800; letter-spacing: 1.9px; }
+                Text { text: "Type this exactly to start the break:"; color: T.mut; font-size: 15px; }
                 Rectangle {
-                    background: T.input; border-radius: 10px; height: 84px;
-                    border-color: T.line; border-width: 1px;
+                    background: T.input; border-radius: 12.5px; height: 105px;
+                    border-color: T.line; border-width: 1.3px;
                     ScrollView {
-                        Text { text: G.challenge_text; color: T.blue; font-size: 13px; font-family: "Consolas"; wrap: word-wrap; x: 12px; y: 10px; }
+                        Text { text: G.challenge_text; color: T.blue; font-size: 16.3px; font-family: "Consolas"; wrap: word-wrap; x: 15px; y: 12.5px; }
                     }
                 }
                 challenge_in := Field { placeholder-text: "type the text here…"; }
                 HorizontalLayout {
-                    spacing: 8px;
+                    spacing: 10px;
                     Btn { label: "Cancel"; clicked => { G.challenge_text = ""; } }
                     Btn { label: "Complete break"; primary: true;
                         clicked => {
@@ -353,21 +354,21 @@ export component AppWindow inherits Window {
         z: 101;
         background: #0a0618ee;
         Card {
-            width: 520px; height: 220px;
+            width: 650px; height: 275px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             border-color: T.amber;
             VerticalLayout {
-                padding: 22px; spacing: 12px;
-                Text { text: "SAVE THIS CREDENTIAL — IT IS SHOWN ONCE"; color: T.amber; font-size: 10px; font-weight: 800; letter-spacing: 1.2px; }
+                padding: 27.5px; spacing: 15px;
+                Text { text: "SAVE THIS CREDENTIAL — IT IS SHOWN ONCE"; color: T.amber; font-size: 12.5px; font-weight: 800; letter-spacing: 1.5px; }
                 Rectangle {
-                    background: T.input; border-radius: 10px; height: 62px;
-                    border-color: T.line; border-width: 1px;
+                    background: T.input; border-radius: 12.5px; height: 77.5px;
+                    border-color: T.line; border-width: 1.3px;
                     ScrollView {
-                        Text { text: G.generated; color: #ffd08a; font-size: 13px; font-family: "Consolas"; wrap: word-wrap; x: 12px; y: 10px; }
+                        Text { text: G.generated; color: #ffd08a; font-size: 16.3px; font-family: "Consolas"; wrap: word-wrap; x: 15px; y: 12.5px; }
                     }
                 }
-                Text { text: "You need it to end early. Copy it somewhere unreachable."; color: T.mut; font-size: 11px; }
+                Text { text: "You need it to end early. Copy it somewhere unreachable."; color: T.mut; font-size: 13.8px; }
                 Btn { label: "I saved it"; primary: true; clicked => { G.generated = ""; } }
             }
         }
@@ -376,78 +377,78 @@ export component AppWindow inherits Window {
     HorizontalLayout {
         // ---------- sidebar ----------
         Rectangle {
-            width: 210px;
+            width: 262.5px;
             background: T.side;
             VerticalLayout {
-                padding: 20px; spacing: 4px;
+                padding: 25px; spacing: 5px;
                 // logo
                 HorizontalLayout {
-                    spacing: 10px;
+                    spacing: 12.5px;
                     Rectangle {
-                        width: 34px; height: 34px; border-radius: 10px;
+                        width: 42.5px; height: 42.5px; border-radius: 12.5px;
                         background: T.grad;
-                        Text { text: "❄"; color: #ffffff; font-size: 15px;
+                        Text { text: "❄"; color: #ffffff; font-size: 18.8px;
                             horizontal-alignment: center; vertical-alignment: center; }
                     }
                     VerticalLayout {
                         alignment: center;
-                        Text { text: "Frozen"; color: T.txt; font-size: 15px; font-weight: 800; letter-spacing: 0.5px; }
-                        Text { text: "BLOCKER"; color: T.faint; font-size: 8px; letter-spacing: 2.5px; font-weight: 700; }
+                        Text { text: "Frozen"; color: T.txt; font-size: 18.8px; font-weight: 800; letter-spacing: 0.6px; }
+                        Text { text: "BLOCKER"; color: T.faint; font-size: 10px; letter-spacing: 3.1px; font-weight: 700; }
                     }
                 }
-                Rectangle { height: 26px; }
+                Rectangle { height: 32.5px; }
                 SectionLabel { text: "CONTROL"; }
-                Rectangle { height: 6px; }
+                Rectangle { height: 7.5px; }
                 for item[i] in ["Dashboard", "Blocks", "Focus"] : Rectangle {
-                    height: 36px; border-radius: 10px;
+                    height: 45px; border-radius: 12.5px;
                     background: root.page == i ? T.panel-2 : (ta-ctl.has-hover ? #1a1435 : transparent);
                     animate background { duration: 100ms; }
                     if root.page == i : Rectangle {
-                        x: 0; width: 3px; height: 18px; y: 9px;
-                        border-radius: 2px;
+                        x: 0; width: 3.8px; height: 22.5px; y: 11.3px;
+                        border-radius: 2.5px;
                         background: T.grad;
                     }
                     HorizontalLayout {
-                        padding-left: 14px; spacing: 10px;
+                        padding-left: 17.5px; spacing: 12.5px;
                         Text {
                             text: i == 0 ? "◆" : i == 1 ? "■" : "◎";
                             color: root.page == i ? [T.violet, T.pink, T.orange][i] : T.faint;
-                            font-size: 12px; vertical-alignment: center;
+                            font-size: 15px; vertical-alignment: center;
                         }
                         Text {
                             text: item;
                             color: root.page == i ? T.txt : T.mut;
-                            font-size: 12px;
+                            font-size: 15px;
                             font-weight: root.page == i ? 700 : 500;
                             vertical-alignment: center;
                         }
                     }
                     ta-ctl := TouchArea { clicked => { root.page = i; } mouse-cursor: pointer; }
                 }
-                Rectangle { height: 14px; }
+                Rectangle { height: 17.5px; }
                 SectionLabel { text: "INSIGHT"; }
-                Rectangle { height: 6px; }
+                Rectangle { height: 7.5px; }
                 for item[i] in ["Stats", "Audit"] : Rectangle {
                     property <int> pg: i + 3;
-                    height: 36px; border-radius: 10px;
+                    height: 45px; border-radius: 12.5px;
                     background: root.page == pg ? T.panel-2 : (ta-ins.has-hover ? #1a1435 : transparent);
                     animate background { duration: 100ms; }
                     if root.page == pg : Rectangle {
-                        x: 0; width: 3px; height: 18px; y: 9px;
-                        border-radius: 2px;
+                        x: 0; width: 3.8px; height: 22.5px; y: 11.3px;
+                        border-radius: 2.5px;
                         background: T.grad;
                     }
                     HorizontalLayout {
-                        padding-left: 14px; spacing: 10px;
+                        padding-left: 17.5px; spacing: 12.5px;
                         Text {
                             text: i == 0 ? "▲" : "≡";
                             color: root.page == pg ? (i == 0 ? T.blue : T.green) : T.faint;
-                            font-size: 12px; vertical-alignment: center;
+                            font-size: 15px; vertical-alignment: center;
                         }
                         Text {
                             text: item;
                             color: root.page == pg ? T.txt : T.mut;
-                            font-size: 12px;
+                            font-size: 15px;
                             font-weight: root.page == pg ? 700 : 500;
                             vertical-alignment: center;
                         }
@@ -457,16 +458,16 @@ export component AppWindow inherits Window {
                 Rectangle {}
                 // footer status
                 Rectangle {
-                    height: 30px; border-radius: 8px;
+                    height: 37.5px; border-radius: 10px;
                     background: T.panel;
-                    border-color: T.line; border-width: 1px;
+                    border-color: T.line; border-width: 1.3px;
                     HorizontalLayout {
-                        padding-left: 10px; spacing: 7px;
+                        padding-left: 12.5px; spacing: 8.8px;
                         Rectangle {
-                            width: 7px; height: 7px; border-radius: 3.5px; y: 11px;
+                            width: 8.8px; height: 8.8px; border-radius: 4.4px; y: 13.8px;
                             background: G.connected ? T.green : T.danger;
                         }
-                        Text { text: G.connected ? "service online" : "offline"; color: T.mut; font-size: 10px; vertical-alignment: center; }
+                        Text { text: G.connected ? "service online" : "offline"; color: T.mut; font-size: 12.5px; vertical-alignment: center; }
                     }
                 }
             }
@@ -476,12 +477,12 @@ export component AppWindow inherits Window {
         VerticalLayout {
             // topbar
             Rectangle {
-                height: 60px;
+                height: 75px;
                 HorizontalLayout {
-                    padding-left: 26px; padding-right: 26px; spacing: 12px;
+                    padding-left: 32.5px; padding-right: 32.5px; spacing: 15px;
                     VerticalLayout {
                         alignment: center;
-                        Text { text: root.page_names[root.page]; color: T.txt; font-size: 17px; font-weight: 800; }
+                        Text { text: root.page_names[root.page]; color: T.txt; font-size: 21.3px; font-weight: 800; }
                     }
                     Rectangle {}
                     if G.paused : Pill { label: "PAUSED"; bg: #3a2a14; fg: T.amber; dot: T.amber; }
@@ -497,9 +498,9 @@ export component AppWindow inherits Window {
 
                 // ======= Dashboard =======
                 if root.page == 0 : VerticalLayout {
-                    padding: 26px; padding-top: 6px; spacing: 16px;
+                    padding: 32.5px; padding-top: 7.5px; spacing: 20px;
                     HorizontalLayout {
-                        spacing: 14px;
+                        spacing: 17.5px;
                         StatCard { label: "BLOCK LISTS"; value: G.blocks.length; icon: T.violet;
                             sub: "managed rule groups"; }
                         StatCard { label: "STATE REV"; value: G.rev; icon: T.blue;
@@ -509,24 +510,24 @@ export component AppWindow inherits Window {
                             sub: root.frozen_label != "" ? "lockout remaining" : "no lockout active"; }
                     }
                     Card {
-                        height: 128px;
+                        height: 160px;
                         HorizontalLayout {
-                            padding: 20px; spacing: 20px;
+                            padding: 25px; spacing: 25px;
                             VerticalLayout {
-                                spacing: 10px; alignment: center;
+                                spacing: 12.5px; alignment: center;
                                 SectionLabel { text: "GLOBAL CONTROL"; }
                                 HorizontalLayout {
-                                    spacing: 8px;
-                                    Btn { label: G.paused ? "▶  Resume blocking" : "⏸  Pause 5 min"; primary: !G.paused; width: 170px;
+                                    spacing: 10px;
+                                    Btn { label: G.paused ? "▶  Resume blocking" : "⏸  Pause 5 min"; primary: !G.paused; width: 212.5px;
                                         clicked => { G.paused ? G.resume_global() : G.pause_global(300); } }
-                                    Btn { label: "◎  Focus mode"; width: 130px; clicked => { root.page = 2; } }
+                                    Btn { label: "◎  Focus mode"; width: 162.5px; clicked => { root.page = 2; } }
                                 }
                             }
                             Rectangle {}
                             VerticalLayout {
-                                alignment: center; spacing: 4px;
-                                Text { text: "Blocking runs through the browser extension —"; color: T.faint; font-size: 10px; horizontal-alignment: right; }
-                                Text { text: "rule changes apply instantly on state push."; color: T.faint; font-size: 10px; horizontal-alignment: right; }
+                                alignment: center; spacing: 5px;
+                                Text { text: "Blocking runs through the browser extension —"; color: T.faint; font-size: 12.5px; horizontal-alignment: right; }
+                                Text { text: "rule changes apply instantly on state push."; color: T.faint; font-size: 12.5px; horizontal-alignment: right; }
                             }
                         }
                     }
@@ -534,26 +535,26 @@ export component AppWindow inherits Window {
                     SectionLabel { text: "LISTS AT A GLANCE"; }
                     ScrollView {
                         HorizontalLayout {
-                            spacing: 10px;
+                            spacing: 12.5px;
                             for b in G.blocks : Rectangle {
-                                height: 74px; min-width: 190px; border-radius: 12px;
+                                height: 92.5px; min-width: 237.5px; border-radius: 15px;
                                 background: T.panel;
-                                border-color: T.line; border-width: 1px;
+                                border-color: T.line; border-width: 1.3px;
                                 VerticalLayout {
-                                    padding: 12px; spacing: 5px;
+                                    padding: 15px; spacing: 6.3px;
                                     HorizontalLayout {
-                                        spacing: 7px;
+                                        spacing: 8.8px;
                                         Rectangle {
-                                            width: 7px; height: 7px; border-radius: 3.5px; y: 4px;
+                                            width: 8.8px; height: 8.8px; border-radius: 4.4px; y: 5px;
                                             background: b.active ? T.green : (b.enabled ? T.amber : T.faint);
                                         }
-                                        Text { text: b.name; color: T.txt; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                                        Text { text: b.name; color: T.txt; font-size: 15px; font-weight: 700; vertical-alignment: center; }
                                         Rectangle {}
                                         if b.lock != "" && b.lock != "none" : Pill { label: b.lock; bg: #3a1d33; fg: T.pink; }
                                     }
                                     Text {
                                         text: (b.active ? "blocking now" : b.enabled ? "enabled" : "off") + "  ·  " + b.rules.length + " rules";
-                                        color: b.active ? T.green : T.faint; font-size: 10px;
+                                        color: b.active ? T.green : T.faint; font-size: 12.5px;
                                     }
                                 }
                             }
@@ -564,14 +565,14 @@ export component AppWindow inherits Window {
 
                 // ======= Blocks =======
                 if root.page == 1 : HorizontalLayout {
-                    padding: 26px; padding-top: 6px; spacing: 16px;
+                    padding: 32.5px; padding-top: 7.5px; spacing: 20px;
                     // list column
                     VerticalLayout {
-                        width: 310px; spacing: 10px;
+                        width: 387.5px; spacing: 12.5px;
                         HorizontalLayout {
-                            spacing: 8px;
+                            spacing: 10px;
                             new_name := Field { placeholder-text: "New block list…"; }
-                            Btn { label: "+"; width: 38px; primary: true;
+                            Btn { label: "+"; width: 47.5px; primary: true;
                                 clicked => {
                                     if new_name.text != "" {
                                         G.add_block(new_name.text);
@@ -580,32 +581,33 @@ export component AppWindow inherits Window {
                                 }
                             }
                         }
-                        ScrollView {
+                        lsv := ScrollView {
                             VerticalLayout {
-                                spacing: 8px; alignment: start;
+                                width: lsv.visible-width;
+                                spacing: 10px; alignment: start;
                                 for b[i] in G.blocks : Rectangle {
-                                    height: 52px; border-radius: 12px;
+                                    height: 65px; border-radius: 15px;
                                     background: root.sel == i ? T.panel-2 : T.panel;
                                     border-color: root.sel == i ? T.violet : T.line-soft;
-                                    border-width: 1px;
+                                    border-width: 1.3px;
                                     HorizontalLayout {
-                                        padding-left: 14px; padding-right: 12px; spacing: 10px;
+                                        padding-left: 17.5px; padding-right: 15px; spacing: 12.5px;
                                         Rectangle {
-                                            width: 8px; height: 8px; border-radius: 4px; y: 22px;
+                                            width: 10px; height: 10px; border-radius: 5px; y: 27.5px;
                                             background: b.active ? T.green : (b.enabled ? T.amber : T.faint);
                                         }
                                         VerticalLayout {
-                                            alignment: center; spacing: 2px;
-                                            Text { text: b.name; color: T.txt; font-size: 13px; font-weight: 700; }
+                                            alignment: center; spacing: 2.5px;
+                                            Text { text: b.name; color: T.txt; font-size: 16.3px; font-weight: 700; }
                                             Text {
                                                 text: (b.active ? "ACTIVE" : b.enabled ? "enabled" : "off")
                                                     + "  ·  " + b.rules.length + " rules"
                                                     + (b.lock != "" && b.lock != "none" ? "  ·  " + b.lock : "");
-                                                color: b.active ? T.green : T.faint; font-size: 10px;
+                                                color: b.active ? T.green : T.faint; font-size: 12.5px;
                                             }
                                         }
                                         Rectangle {}
-                                        Text { text: "›"; color: T.faint; font-size: 14px; vertical-alignment: center; }
+                                        Text { text: "›"; color: T.faint; font-size: 17.5px; vertical-alignment: center; }
                                     }
                                     TouchArea { clicked => { root.sel = i; } mouse-cursor: pointer; }
                                 }
@@ -615,14 +617,15 @@ export component AppWindow inherits Window {
 
                     // detail
                     if root.sel >= 0 && root.sel < G.blocks.length : Card {
-                        ScrollView {
+                        dsv := ScrollView {
                             VerticalLayout {
-                                padding: 22px; spacing: 14px; alignment: start;
+                                width: dsv.visible-width;
+                                padding: 27.5px; spacing: 17.5px; alignment: start;
                                 property <BlockRow> b: G.blocks[root.sel];
 
                                 HorizontalLayout {
-                                    spacing: 10px;
-                                    Text { text: b.name; color: T.txt; font-size: 18px; font-weight: 800; }
+                                    spacing: 12.5px;
+                                    Text { text: b.name; color: T.txt; font-size: 22.5px; font-weight: 800; }
                                     if b.active : Pill { label: "ACTIVE"; bg: #173a2a; fg: T.green; dot: T.green; }
                                     if b.lock != "" && b.lock != "none" : Pill { label: "LOCK " + b.lock; bg: #3a1d33; fg: T.pink; dot: T.pink; }
                                     if b.allow_mode : Pill { label: "ALLOW-LIST"; bg: #14294a; fg: T.blue; }
@@ -632,41 +635,41 @@ export component AppWindow inherits Window {
                                         bg: #3a2a14; fg: T.amber; dot: T.amber;
                                     }
                                     Rectangle {}
-                                    Btn { label: b.enabled ? "Stop" : "Start"; primary: !b.enabled; danger: b.enabled; width: 74px;
+                                    Btn { label: b.enabled ? "Stop" : "Start"; primary: !b.enabled; danger: b.enabled; width: 92.5px;
                                         clicked => {
                                             b.enabled ? G.stop_block(b.name) : G.start_block(b.name);
                                         }
                                     }
-                                    Btn { label: "Delete"; danger: true; width: 70px;
+                                    Btn { label: "Delete"; danger: true; width: 87.5px;
                                         clicked => { G.remove_block(b.name); root.sel = -1; }
                                     }
                                 }
 
                                 SectionLabel { text: "BLOCKED RULES"; }
                                 Rectangle {
-                                    border-radius: 10px; background: T.input;
-                                    border-color: T.line-soft; border-width: 1px;
+                                    border-radius: 12.5px; background: T.input;
+                                    border-color: T.line-soft; border-width: 1.3px;
                                     VerticalLayout {
-                                        padding: 6px; spacing: 2px;
+                                        padding: 7.5px; spacing: 2.5px;
                                         for r in b.rules : Rectangle {
-                                            height: r.negated ? 0px : 30px;
+                                            height: r.negated ? 0px : 37.5px;
                                             if !r.negated : HorizontalLayout {
-                                                padding-left: 6px; spacing: 8px;
-                                                Pill { label: r.kind; width: 74px; bg: T.panel-2; fg: T.mut; }
-                                                Text { text: r.value; color: T.txt; font-size: 12px; vertical-alignment: center; }
+                                                padding-left: 7.5px; spacing: 10px;
+                                                Pill { label: r.kind; width: 92.5px; bg: T.panel-2; fg: T.mut; }
+                                                Text { text: r.value; color: T.txt; font-size: 15px; vertical-alignment: center; }
                                                 Rectangle {}
-                                                Btn { label: "×"; width: 30px; height: 26px; danger: true;
+                                                Btn { label: "×"; width: 37.5px; height: 32.5px; danger: true;
                                                     clicked => { G.remove_rule(b.name, r.value); } }
                                             }
                                         }
-                                        if b.rules.length == 0 : Text { text: "  No rules yet — add one below."; color: T.faint; font-size: 11px; }
+                                        if b.rules.length == 0 : Text { text: "  No rules yet — add one below."; color: T.faint; font-size: 13.8px; }
                                     }
                                 }
                                 HorizontalLayout {
-                                    spacing: 8px;
-                                    kind_cb := Pick { width: 110px; model: ["domain", "url", "app", "keyword", "wildcard", "regex", "path", "title"]; }
+                                    spacing: 10px;
+                                    kind_cb := Pick { width: 137.5px; model: ["domain", "url", "app", "keyword", "wildcard", "regex", "path", "title"]; }
                                     rule_in := Field { placeholder-text: "example.com or app.exe…"; }
-                                    Btn { label: "Block it"; primary: true; width: 90px;
+                                    Btn { label: "Block it"; primary: true; width: 112.5px;
                                         clicked => {
                                             if rule_in.text != "" {
                                                 G.add_rule(b.name, kind_cb.current-value, rule_in.text);
@@ -678,27 +681,27 @@ export component AppWindow inherits Window {
 
                                 SectionLabel { text: "EXCEPTIONS — ALWAYS ALLOWED"; }
                                 Rectangle {
-                                    border-radius: 10px; background: T.input;
-                                    border-color: T.line-soft; border-width: 1px;
+                                    border-radius: 12.5px; background: T.input;
+                                    border-color: T.line-soft; border-width: 1.3px;
                                     VerticalLayout {
-                                        padding: 6px; spacing: 2px;
+                                        padding: 7.5px; spacing: 2.5px;
                                         for r in b.rules : Rectangle {
-                                            height: r.negated ? 30px : 0px;
+                                            height: r.negated ? 37.5px : 0px;
                                             if r.negated : HorizontalLayout {
-                                                padding-left: 6px; spacing: 8px;
-                                                Pill { label: "allow"; bg: #173a2a; fg: T.green; width: 74px; }
-                                                Text { text: r.value; color: #9adfb4; font-size: 12px; vertical-alignment: center; }
+                                                padding-left: 7.5px; spacing: 10px;
+                                                Pill { label: "allow"; bg: #173a2a; fg: T.green; width: 92.5px; }
+                                                Text { text: r.value; color: #9adfb4; font-size: 15px; vertical-alignment: center; }
                                                 Rectangle {}
-                                                Btn { label: "×"; width: 30px; height: 26px; danger: true;
+                                                Btn { label: "×"; width: 37.5px; height: 32.5px; danger: true;
                                                     clicked => { G.remove_rule(b.name, r.value); } }
                                             }
                                         }
                                     }
                                 }
                                 HorizontalLayout {
-                                    spacing: 8px;
+                                    spacing: 10px;
                                     ex_in := Field { placeholder-text: "exception — allowed even while blocking…"; }
-                                    Btn { label: "Add exception"; width: 110px;
+                                    Btn { label: "Add exception"; width: 137.5px;
                                         clicked => {
                                             if ex_in.text != "" {
                                                 G.add_exception(b.name, ex_in.text);
@@ -710,115 +713,115 @@ export component AppWindow inherits Window {
 
                                 SectionLabel { text: "LOCK"; }
                                 HorizontalLayout {
-                                    spacing: 8px;
-                                    lock_cb := Pick { width: 130px; model: ["none", "timer", "range", "password", "random", "restart", "allowance", "enforced", "frozen"]; }
-                                    lock_arg := Field { width: 190px; placeholder-text: "until(s) / password / len…"; }
-                                    Btn { label: "Set lock"; width: 80px;
+                                    spacing: 10px;
+                                    lock_cb := Pick { width: 162.5px; model: ["none", "timer", "range", "password", "random", "restart", "allowance", "enforced", "frozen"]; }
+                                    lock_arg := Field { placeholder-text: "until(s) / password / len…"; }
+                                    Btn { label: "Set lock"; width: 100px;
                                         clicked => { G.set_lock(b.name, lock_cb.current-value, lock_arg.text); }
                                     }
                                     Rectangle {}
-                                    cred_in := Field { width: 190px; placeholder-text: "credential…"; }
-                                    Btn { label: "Unlock"; danger: true; width: 76px;
+                                    cred_in := Field { placeholder-text: "credential…"; }
+                                    Btn { label: "Unlock"; danger: true; width: 95px;
                                         clicked => { G.unlock(b.name, cred_in.text); }
                                     }
                                 }
 
                                 SectionLabel { text: "BREAKS"; }
                                 HorizontalLayout {
-                                    spacing: 8px;
+                                    spacing: 10px;
                                     Btn { label: "Delay break"; clicked => { G.delay_break(b.name); } }
                                     Btn { label: "Random-text break"; clicked => { G.random_break(b.name); } }
                                     Btn { label: "Cause break"; clicked => { G.cause_break(b.name); } }
                                     Rectangle {}
                                     Btn { label: "End break"; danger: true; clicked => { G.end_break(b.name); } }
                                 }
-                                Rectangle { height: 10px; }
+                                Rectangle { height: 12.5px; }
                             }
                         }
                     }
                     if !(root.sel >= 0 && root.sel < G.blocks.length) : Card {
                         VerticalLayout {
-                            alignment: center; spacing: 8px;
-                            Text { text: "■"; color: T.faint; font-size: 30px; horizontal-alignment: center; }
-                            Text { text: "Select a block list"; color: T.mut; font-size: 14px; font-weight: 600; horizontal-alignment: center; }
-                            Text { text: "Pick a list on the left to edit its rules,\nexceptions, lock and break controls."; color: T.faint; font-size: 11px; horizontal-alignment: center; }
+                            alignment: center; spacing: 10px;
+                            Text { text: "■"; color: T.faint; font-size: 37.5px; horizontal-alignment: center; }
+                            Text { text: "Select a block list"; color: T.mut; font-size: 17.5px; font-weight: 600; horizontal-alignment: center; }
+                            Text { text: "Pick a list on the left to edit its rules,\nexceptions, lock and break controls."; color: T.faint; font-size: 13.8px; horizontal-alignment: center; }
                         }
                     }
                 }
 
                 // ======= Focus =======
                 if root.page == 2 : VerticalLayout {
-                    padding: 26px; padding-top: 6px; spacing: 16px;
+                    padding: 32.5px; padding-top: 7.5px; spacing: 20px;
                     Card {
-                        height: 214px;
+                        height: 267.5px;
                         VerticalLayout {
-                            padding: 20px; spacing: 12px;
+                            padding: 25px; spacing: 15px;
                             HorizontalLayout {
-                                spacing: 10px;
+                                spacing: 12.5px;
                                 Rectangle {
-                                    width: 30px; height: 30px; border-radius: 9px;
+                                    width: 37.5px; height: 37.5px; border-radius: 11.3px;
                                     background: T.pink.with-alpha(0.16);
-                                    Text { text: "❄"; color: T.pink; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+                                    Text { text: "❄"; color: T.pink; font-size: 16.3px; horizontal-alignment: center; vertical-alignment: center; }
                                 }
                                 VerticalLayout {
                                     alignment: center;
-                                    Text { text: "FROZEN MODE"; color: T.txt; font-size: 11px; font-weight: 800; letter-spacing: 1.2px; }
+                                    Text { text: "FROZEN MODE"; color: T.txt; font-size: 13.8px; font-weight: 800; letter-spacing: 1.5px; }
                                 }
                                 if root.frozen_label != "" : Pill { label: root.frozen_label; bg: #3a1d33; fg: T.pink; dot: T.pink; }
                                 if G.frozen_locked : Pill { label: "LOCKED"; bg: #3a2a14; fg: T.amber; dot: T.amber; }
                                 Rectangle {}
                             }
-                            Text { text: "Full-screen lockout — kills non-allowlisted apps and covers the desktop until the timer ends."; color: T.faint; font-size: 11px; }
+                            Text { text: "Full-screen lockout — kills non-allowlisted apps and covers the desktop until the timer ends."; color: T.faint; font-size: 13.8px; }
                             HorizontalLayout {
-                                spacing: 8px;
-                                fz_min := Field { width: 90px; placeholder-text: "minutes"; text: "60"; }
-                                fz_lock := Pick { width: 120px; model: ["none", "password", "random"]; }
-                                fz_arg := Field { width: 150px; placeholder-text: "password / len"; }
-                                Btn { label: "Start Frozen"; primary: true; width: 120px;
+                                spacing: 10px;
+                                fz_min := Field { width: 112.5px; placeholder-text: "minutes"; text: "60"; }
+                                fz_lock := Pick { width: 150px; model: ["none", "password", "random"]; }
+                                fz_arg := Field { width: 187.5px; placeholder-text: "password / len"; }
+                                Btn { label: "Start Frozen"; primary: true; width: 150px;
                                     clicked => { G.frozen_start(fz_min.text.to-float(), fz_lock.current-value, fz_arg.text); }
                                 }
                             }
                             HorizontalLayout {
-                                spacing: 8px;
+                                spacing: 10px;
                                 fz_cred := Field { placeholder-text: "credential to end early…"; }
-                                Btn { label: "End Frozen"; danger: true; width: 110px;
+                                Btn { label: "End Frozen"; danger: true; width: 137.5px;
                                     clicked => { G.frozen_stop(fz_cred.text); }
                                 }
                             }
                         }
                     }
                     Card {
-                        height: 172px;
+                        height: 215px;
                         VerticalLayout {
-                            padding: 20px; spacing: 12px;
+                            padding: 25px; spacing: 15px;
                             HorizontalLayout {
-                                spacing: 10px;
+                                spacing: 12.5px;
                                 Rectangle {
-                                    width: 30px; height: 30px; border-radius: 9px;
+                                    width: 37.5px; height: 37.5px; border-radius: 11.3px;
                                     background: T.orange.with-alpha(0.16);
-                                    Text { text: "◎"; color: T.orange; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+                                    Text { text: "◎"; color: T.orange; font-size: 16.3px; horizontal-alignment: center; vertical-alignment: center; }
                                 }
                                 VerticalLayout {
                                     alignment: center;
-                                    Text { text: "POMODORO"; color: T.txt; font-size: 11px; font-weight: 800; letter-spacing: 1.2px; }
+                                    Text { text: "POMODORO"; color: T.txt; font-size: 13.8px; font-weight: 800; letter-spacing: 1.5px; }
                                 }
                                 if G.pomodoro != "" && G.pomodoro != "off" : Pill { label: G.pomodoro; bg: #14294a; fg: T.blue; dot: T.blue; }
                                 Rectangle {}
                             }
                             HorizontalLayout {
-                                spacing: 8px;
+                                spacing: 10px;
                                 for p in ["classic", "long", "sprint"] : Btn {
                                     label: p;
                                     clicked => { G.pomo("start", p); }
                                 }
                             }
                             HorizontalLayout {
-                                spacing: 8px;
+                                spacing: 10px;
                                 Btn { label: "Skip"; clicked => { G.pomo("skip", ""); } }
                                 Btn { label: "Pause"; clicked => { G.pomo("pause", ""); } }
                                 Btn { label: "Resume"; clicked => { G.pomo("resume", ""); } }
                                 Rectangle {}
-                                Btn { label: "Stop"; danger: true; width: 90px; clicked => { G.pomo("stop", ""); } }
+                                Btn { label: "Stop"; danger: true; width: 112.5px; clicked => { G.pomo("stop", ""); } }
                             }
                         }
                     }
@@ -827,25 +830,26 @@ export component AppWindow inherits Window {
 
                 // ======= Stats =======
                 if root.page == 3 : VerticalLayout {
-                    padding: 26px; padding-top: 6px; spacing: 12px;
+                    padding: 32.5px; padding-top: 7.5px; spacing: 15px;
                     HorizontalLayout {
-                        spacing: 10px;
-                        Text { text: "Last 7 days"; color: T.mut; font-size: 12px; vertical-alignment: center; }
+                        spacing: 12.5px;
+                        Text { text: "Last 7 days"; color: T.mut; font-size: 15px; vertical-alignment: center; }
                         Rectangle {}
-                        Btn { label: "Refresh"; width: 100px; clicked => { G.refresh_stats(); } }
+                        Btn { label: "Refresh"; width: 125px; clicked => { G.refresh_stats(); } }
                     }
-                    ScrollView {
+                    ssv := ScrollView {
                         Card {
+                            width: ssv.visible-width;
                             VerticalLayout {
-                                padding: 12px; spacing: 0px;
+                                padding: 15px; spacing: 0px;
                                 for s in G.stats : HorizontalLayout {
-                                    height: 30px; spacing: 10px;
-                                    Pill { label: s.group; width: 86px; bg: T.panel-2; fg: T.faint; }
-                                    Text { text: s.name; color: T.txt; font-size: 12px; vertical-alignment: center; }
+                                    height: 37.5px; spacing: 12.5px;
+                                    Pill { label: s.group; width: 107.5px; bg: T.panel-2; fg: T.faint; }
+                                    Text { text: s.name; color: T.txt; font-size: 15px; vertical-alignment: center; }
                                     Rectangle {}
-                                    Text { text: s.value; color: T.blue; font-size: 12px; vertical-alignment: center; }
+                                    Text { text: s.value; color: T.blue; font-size: 15px; vertical-alignment: center; }
                                 }
-                                if G.stats.length == 0 : Text { text: "  No stats yet."; color: T.faint; font-size: 12px; }
+                                if G.stats.length == 0 : Text { text: "  No stats yet."; color: T.faint; font-size: 15px; }
                             }
                         }
                     }
@@ -853,27 +857,28 @@ export component AppWindow inherits Window {
 
                 // ======= Audit =======
                 if root.page == 4 : VerticalLayout {
-                    padding: 26px; padding-top: 6px; spacing: 12px;
+                    padding: 32.5px; padding-top: 7.5px; spacing: 15px;
                     HorizontalLayout {
-                        spacing: 10px;
-                        Text { text: "Enforcement event log"; color: T.mut; font-size: 12px; vertical-alignment: center; }
+                        spacing: 12.5px;
+                        Text { text: "Enforcement event log"; color: T.mut; font-size: 15px; vertical-alignment: center; }
                         Rectangle {}
-                        Btn { label: "Refresh"; width: 100px; clicked => { G.refresh_audit(); } }
+                        Btn { label: "Refresh"; width: 125px; clicked => { G.refresh_audit(); } }
                     }
-                    ScrollView {
+                    asv := ScrollView {
                         Card {
+                            width: asv.visible-width;
                             VerticalLayout {
-                                padding: 12px; spacing: 0px;
+                                padding: 15px; spacing: 0px;
                                 for a in G.audits : HorizontalLayout {
-                                    height: 26px; spacing: 10px;
-                                    Text { text: a.time; color: T.faint; font-size: 11px; width: 64px; vertical-alignment: center; font-family: "Consolas"; }
-                                    Pill { label: a.actor; width: 52px;
+                                    height: 32.5px; spacing: 12.5px;
+                                    Text { text: a.time; color: T.faint; font-size: 13.8px; width: 80px; vertical-alignment: center; font-family: "Consolas"; }
+                                    Pill { label: a.actor; width: 65px;
                                         bg: a.actor == "svc" ? #14294a : a.actor == "rpc" ? #2b1f5e : T.panel-2;
                                         fg: a.actor == "svc" ? T.blue : a.actor == "rpc" ? T.violet : T.mut; }
-                                    Text { text: a.action; color: T.txt; font-size: 11px; width: 140px; vertical-alignment: center; font-weight: 600; }
-                                    Text { text: a.detail; color: T.mut; font-size: 11px; vertical-alignment: center; overflow: elide; }
+                                    Text { text: a.action; color: T.txt; font-size: 13.8px; width: 175px; vertical-alignment: center; font-weight: 600; }
+                                    Text { text: a.detail; color: T.mut; font-size: 13.8px; vertical-alignment: center; overflow: elide; }
                                 }
-                                if G.audits.length == 0 : Text { text: "  No events yet."; color: T.faint; font-size: 12px; }
+                                if G.audits.length == 0 : Text { text: "  No events yet."; color: T.faint; font-size: 15px; }
                             }
                         }
                     }
