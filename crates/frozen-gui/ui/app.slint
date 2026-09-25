@@ -1,4 +1,4 @@
-import { LineEdit, ComboBox, ScrollView } from "std-widgets.slint";
+import { ScrollView } from "std-widgets.slint";
 
 export struct RuleRow { kind: string, value: string, negated: bool }
 export struct BlockRow {
@@ -58,67 +58,220 @@ export global G {
     callback refresh_audit();
 }
 
+// ---------- theme ----------
+
+// deep-purple glassy dashboard (reference: ASO.dev dark)
+global T {
+    out property <color> canvas: #140f28;
+    out property <color> panel: #1c1636;
+    out property <color> panel-2: #221b45;
+    out property <color> side: #100b22;
+    out property <color> input: #150f2e;
+    out property <color> line: #2b2452;
+    out property <color> line-soft: #241e48;
+    out property <color> txt: #efecf8;
+    out property <color> mut: #9a92c0;
+    out property <color> faint: #5f5788;
+    out property <color> pink: #ff5c8a;
+    out property <color> orange: #ff9d5c;
+    out property <color> violet: #8b6cff;
+    out property <color> blue: #6aa9ff;
+    out property <color> green: #4ade80;
+    out property <color> amber: #fbbf24;
+    out property <color> danger: #ff6b81;
+    out property <brush> grad: @linear-gradient(120deg, #ff9d5c 0%, #ff5c8a 100%);
+    out property <brush> grad-violet: @linear-gradient(120deg, #8b6cff 0%, #ff5c8a 100%);
+    out property <brush> grad-soft: @linear-gradient(120deg, #2b1f5e 0%, #3a1d4d 100%);
+}
+
 // ---------- atoms ----------
 
-component Chip inherits Rectangle {
+component Pill inherits Rectangle {
     in property <string> label;
-    in property <color> bg: #1c2530;
-    in property <color> fg: #8aa0b4;
+    in property <color> bg: T.panel-2;
+    in property <color> fg: T.mut;
+    in property <color> dot: transparent;
     background: root.bg;
-    border-radius: 9px;
-    height: 18px;
-    Text {
-        text: root.label;
-        color: root.fg;
-        font-size: 10px;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    border-radius: root.height / 2;
+    border-color: T.line;
+    border-width: 1px;
+    height: 20px;
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    lay := HorizontalLayout {
+        padding-left: 8px; padding-right: 9px; spacing: 5px; alignment: center;
+        if root.dot != transparent : Rectangle {
+            width: 5px; height: 5px; border-radius: 2.5px; y: 0px;
+            background: root.dot;
+        }
+        Text {
+            text: root.label;
+            color: root.fg;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            vertical-alignment: center;
+        }
     }
+    width: lay.preferred-width;
 }
 
 component Btn inherits Rectangle {
     in property <string> label;
-    in property <color> bg: #223047;
-    in property <color> fg: #dbe7f3;
+    in property <color> fg: #d7d2ef;
     in property <bool> danger: false;
     in property <bool> primary: false;
     callback clicked();
-    height: 30px;
-    border-radius: 6px;
-    background: root.primary ? (ta.pressed ? #2559c7 : #2f6fed)
-        : root.danger ? (ta.pressed ? #a13333 : #7d2b2b)
-        : (ta.pressed ? #2c3d55 : root.bg);
-    animate background { duration: 80ms; }
+    height: 32px;
+    horizontal-stretch: 0;
+    width: max(48px, bt.preferred-width + 22px);
+    border-radius: 8px;
+    border-width: root.primary ? 0px : 1px;
+    border-color: root.danger ? #5c2340 : T.line;
+    background: root.primary
+        ? (ta.pressed ? @linear-gradient(120deg, #e8893f, #e8476f) : T.grad)
+        : root.danger
+            ? (ta.pressed ? #472036 : #3a1830)
+            : (ta.pressed ? #2a2252 : T.panel-2);
+    animate background { duration: 90ms; }
     ta := TouchArea {
         clicked => { root.clicked(); }
         mouse-cursor: pointer;
     }
-    Text {
+    bt := Text {
         text: root.label;
-        color: root.primary ? #ffffff : root.danger ? #f3d8d8 : root.fg;
-        font-size: 12px;
+        color: root.primary ? #ffffff : root.danger ? T.danger : root.fg;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.4px;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
 }
 
 component Card inherits Rectangle {
-    background: #131a24;
-    border-radius: 10px;
-    border-color: #1f2a3a;
+    background: T.panel;
+    border-radius: 14px;
+    border-color: T.line;
     border-width: 1px;
 }
 
-component Field inherits LineEdit {
-    height: 30px;
-    font-size: 12px;
+component Field inherits Rectangle {
+    in-out property <string> text <=> inp.text;
+    in property <string> placeholder-text: "";
+    height: 32px;
+    border-radius: 8px;
+    background: T.input;
+    border-color: inp.has-focus ? T.violet : T.line;
+    border-width: 1px;
+    inp := TextInput {
+        x: 10px;
+        width: parent.width - 20px;
+        height: parent.height;
+        vertical-alignment: center;
+        color: T.txt;
+        font-size: 12px;
+        selection-background-color: T.violet.with-alpha(0.5);
+        selection-foreground-color: #ffffff;
+    }
+    if inp.text == "" : Text {
+        x: 10px;
+        height: parent.height;
+        text: root.placeholder-text;
+        color: T.faint;
+        font-size: 12px;
+        vertical-alignment: center;
+    }
+    TouchArea { clicked => { inp.focus(); } }
 }
 
-component SectionTitle inherits Text {
-    color: #8aa0b4;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1px;
+component Pick inherits Rectangle {
+    in property <[string]> model: [];
+    in-out property <int> current-index: 0;
+    out property <string> current-value: root.model.length > 0 && root.current-index < root.model.length ? root.model[root.current-index] : "";
+    height: 32px;
+    border-radius: 8px;
+    background: T.input;
+    border-color: T.line;
+    border-width: 1px;
+    HorizontalLayout {
+        padding-left: 10px; padding-right: 8px;
+        Text {
+            text: root.current-value == "" ? "…" : root.current-value;
+            color: root.current-value == "" ? T.faint : T.txt;
+            font-size: 12px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        Text { text: "▾"; color: T.mut; font-size: 11px; vertical-alignment: center; }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { pop.show(); }
+    }
+    pop := PopupWindow {
+        x: 0; y: parent.height + 4px;
+        width: max(root.width, 140px);
+        Rectangle {
+            background: T.panel-2;
+            border-radius: 10px;
+            border-color: T.line;
+            border-width: 1px;
+            drop-shadow-blur: 18px;
+            drop-shadow-color: #00000080;
+            VerticalLayout {
+                padding: 5px;
+                spacing: 1px;
+                for it[idx] in root.model : Rectangle {
+                    height: 30px;
+                    border-radius: 7px;
+                    background: idx == root.current-index ? T.violet.with-alpha(0.22) : (row_ta.has-hover ? T.panel : transparent);
+                    row_ta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.current-index = idx; pop.close(); }
+                    }
+                    Text {
+                        text: it; x: 10px;
+                        color: idx == root.current-index ? T.txt : T.mut;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        font-weight: idx == root.current-index ? 700 : 400;
+                    }
+                }
+            }
+        }
+    }
+}
+
+component SectionLabel inherits Text {
+    color: T.faint;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+}
+
+component StatCard inherits Card {
+    in property <string> label;
+    in property <string> value;
+    in property <string> sub: "";
+    in property <color> icon: T.violet;
+    height: 96px;
+    HorizontalLayout {
+        padding: 16px; spacing: 10px;
+        VerticalLayout {
+            spacing: 3px; alignment: center;
+            Text { text: root.label; color: T.faint; font-size: 9px; font-weight: 800; letter-spacing: 1.4px; }
+            Text { text: root.value; color: T.txt; font-size: 30px; font-weight: 800; }
+            if root.sub != "" : Text { text: root.sub; color: T.mut; font-size: 10px; }
+        }
+        Rectangle {}
+        Rectangle {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: root.icon.with-alpha(0.16);
+            Text { text: "◆"; color: root.icon; font-size: 14px;
+                horizontal-alignment: center; vertical-alignment: center; }
+        }
+    }
 }
 
 // ---------- main ----------
@@ -127,7 +280,8 @@ export component AppWindow inherits Window {
     title: "Frozen";
     min-width: 1000px;
     min-height: 680px;
-    background: #0b0e14;
+    background: @linear-gradient(160deg, #171130 0%, #140f28 45%, #100c22 100%);
+    default-font-family: "Segoe UI";
     property <int> page: 0;
     property <int> sel: -1;
 
@@ -140,36 +294,43 @@ export component AppWindow inherits Window {
 
     property <string> frozen_label: G.frozen_until > G.now
         ? "FROZEN " + fmt_dur(G.frozen_until - G.now) : "";
+    property <[string]> page_names: ["Dashboard", "Blocks", "Focus", "Stats", "Audit"];
 
     // error / toast bar
     if G.last_error != "" || G.toast != "" : Rectangle {
-        y: 0; height: 30px; width: parent.width;
+        y: 10px; height: 34px; width: parent.width - 40px;
+        x: 20px;
         z: 99;
-        background: G.last_error != "" ? #5a2020 : #1f4a2d;
+        border-radius: 10px;
+        background: G.last_error != "" ? #4a1a30 : #173a2a;
+        border-color: G.last_error != "" ? T.danger : T.green;
+        border-width: 1px;
         Text {
-            x: 16px;
-            text: G.last_error != "" ? ("⚠ " + G.last_error) : G.toast;
-            color: #fff; font-size: 12px; vertical-alignment: center;
+            x: 14px;
+            text: G.last_error != "" ? ("⚠  " + G.last_error) : G.toast;
+            color: G.last_error != "" ? #ffb3c2 : #8ff0b3; font-size: 12px;
+            font-weight: 600; vertical-alignment: center;
         }
     }
 
     // random-break challenge modal
     if G.challenge_text != "" : Rectangle {
         z: 100;
-        background: #000000cc;
+        background: #0a0618ee;
         Card {
-            width: 560px; height: 300px;
+            width: 560px; height: 320px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
+            border-color: T.violet;
             VerticalLayout {
-                padding: 20px; spacing: 10px;
-                Text { text: "Random-text break"; color: #e6edf3; font-size: 14px; font-weight: 600; }
-                Text { text: "Type this exactly to start the break:"; color: #8aa0b4; font-size: 12px; }
+                padding: 22px; spacing: 12px;
+                Text { text: "RANDOM-TEXT BREAK"; color: T.violet; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
+                Text { text: "Type this exactly to start the break:"; color: T.mut; font-size: 12px; }
                 Rectangle {
-                    background: #0b0e14; border-radius: 6px; height: 80px;
-                    border-color: #2c3d55; border-width: 1px;
+                    background: T.input; border-radius: 10px; height: 84px;
+                    border-color: T.line; border-width: 1px;
                     ScrollView {
-                        Text { text: G.challenge_text; color: #9ecbff; font-size: 13px; font-family: "Consolas"; wrap: word-wrap; x: 10px; y: 10px; }
+                        Text { text: G.challenge_text; color: T.blue; font-size: 13px; font-family: "Consolas"; wrap: word-wrap; x: 12px; y: 10px; }
                     }
                 }
                 challenge_in := Field { placeholder-text: "type the text here…"; }
@@ -190,22 +351,23 @@ export component AppWindow inherits Window {
     // generated credential modal (shown ONCE)
     if G.generated != "" : Rectangle {
         z: 101;
-        background: #000000cc;
+        background: #0a0618ee;
         Card {
-            width: 520px; height: 210px;
+            width: 520px; height: 220px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
+            border-color: T.amber;
             VerticalLayout {
-                padding: 20px; spacing: 10px;
-                Text { text: "Save this credential — it is shown ONCE"; color: #ffb454; font-size: 14px; font-weight: 700; }
+                padding: 22px; spacing: 12px;
+                Text { text: "SAVE THIS CREDENTIAL — IT IS SHOWN ONCE"; color: T.amber; font-size: 10px; font-weight: 800; letter-spacing: 1.2px; }
                 Rectangle {
-                    background: #0b0e14; border-radius: 6px; height: 60px;
-                    border-color: #7d2b2b; border-width: 1px;
+                    background: T.input; border-radius: 10px; height: 62px;
+                    border-color: T.line; border-width: 1px;
                     ScrollView {
-                        Text { text: G.generated; color: #ffd08a; font-size: 13px; font-family: "Consolas"; wrap: word-wrap; x: 10px; y: 10px; }
+                        Text { text: G.generated; color: #ffd08a; font-size: 13px; font-family: "Consolas"; wrap: word-wrap; x: 12px; y: 10px; }
                     }
                 }
-                Text { text: "You need it to end early. Copy it somewhere unreachable."; color: #8aa0b4; font-size: 11px; }
+                Text { text: "You need it to end early. Copy it somewhere unreachable."; color: T.mut; font-size: 11px; }
                 Btn { label: "I saved it"; primary: true; clicked => { G.generated = ""; } }
             }
         }
@@ -214,33 +376,99 @@ export component AppWindow inherits Window {
     HorizontalLayout {
         // ---------- sidebar ----------
         Rectangle {
-            width: 190px;
-            background: #0d1118;
-            border-color: #1c2634;
-            border-width: 1px;
+            width: 210px;
+            background: T.side;
             VerticalLayout {
-                padding: 18px; spacing: 4px;
-                Text {
-                    text: "◈ FROZEN";
-                    color: #e6edf3; font-size: 17px; font-weight: 800; letter-spacing: 2px;
-                }
-                Text { text: "blocker"; color: #4d6175; font-size: 10px; letter-spacing: 3px; }
-                Rectangle { height: 18px; }
-                for item[i] in ["Dashboard", "Blocks", "Focus", "Stats", "Audit"] : Rectangle {
-                    height: 34px; border-radius: 6px;
-                    background: root.page == i ? #1b2740 : (ta-i.has-hover ? #141b26 : transparent);
-                    animate background { duration: 100ms; }
-                    Text {
-                        x: 12px;
-                        text: item;
-                        color: root.page == i ? #7fb0ff : #8aa0b4;
-                        font-size: 13px;
-                        font-weight: root.page == i ? 700 : 400;
-                        vertical-alignment: center;
+                padding: 20px; spacing: 4px;
+                // logo
+                HorizontalLayout {
+                    spacing: 10px;
+                    Rectangle {
+                        width: 34px; height: 34px; border-radius: 10px;
+                        background: T.grad;
+                        Text { text: "❄"; color: #ffffff; font-size: 15px;
+                            horizontal-alignment: center; vertical-alignment: center; }
                     }
-                    ta-i := TouchArea { clicked => { root.page = i; } mouse-cursor: pointer; }
+                    VerticalLayout {
+                        alignment: center;
+                        Text { text: "Frozen"; color: T.txt; font-size: 15px; font-weight: 800; letter-spacing: 0.5px; }
+                        Text { text: "BLOCKER"; color: T.faint; font-size: 8px; letter-spacing: 2.5px; font-weight: 700; }
+                    }
+                }
+                Rectangle { height: 26px; }
+                SectionLabel { text: "CONTROL"; }
+                Rectangle { height: 6px; }
+                for item[i] in ["Dashboard", "Blocks", "Focus"] : Rectangle {
+                    height: 36px; border-radius: 10px;
+                    background: root.page == i ? T.panel-2 : (ta-ctl.has-hover ? #1a1435 : transparent);
+                    animate background { duration: 100ms; }
+                    if root.page == i : Rectangle {
+                        x: 0; width: 3px; height: 18px; y: 9px;
+                        border-radius: 2px;
+                        background: T.grad;
+                    }
+                    HorizontalLayout {
+                        padding-left: 14px; spacing: 10px;
+                        Text {
+                            text: i == 0 ? "◆" : i == 1 ? "■" : "◎";
+                            color: root.page == i ? [T.violet, T.pink, T.orange][i] : T.faint;
+                            font-size: 12px; vertical-alignment: center;
+                        }
+                        Text {
+                            text: item;
+                            color: root.page == i ? T.txt : T.mut;
+                            font-size: 12px;
+                            font-weight: root.page == i ? 700 : 500;
+                            vertical-alignment: center;
+                        }
+                    }
+                    ta-ctl := TouchArea { clicked => { root.page = i; } mouse-cursor: pointer; }
+                }
+                Rectangle { height: 14px; }
+                SectionLabel { text: "INSIGHT"; }
+                Rectangle { height: 6px; }
+                for item[i] in ["Stats", "Audit"] : Rectangle {
+                    property <int> pg: i + 3;
+                    height: 36px; border-radius: 10px;
+                    background: root.page == pg ? T.panel-2 : (ta-ins.has-hover ? #1a1435 : transparent);
+                    animate background { duration: 100ms; }
+                    if root.page == pg : Rectangle {
+                        x: 0; width: 3px; height: 18px; y: 9px;
+                        border-radius: 2px;
+                        background: T.grad;
+                    }
+                    HorizontalLayout {
+                        padding-left: 14px; spacing: 10px;
+                        Text {
+                            text: i == 0 ? "▲" : "≡";
+                            color: root.page == pg ? (i == 0 ? T.blue : T.green) : T.faint;
+                            font-size: 12px; vertical-alignment: center;
+                        }
+                        Text {
+                            text: item;
+                            color: root.page == pg ? T.txt : T.mut;
+                            font-size: 12px;
+                            font-weight: root.page == pg ? 700 : 500;
+                            vertical-alignment: center;
+                        }
+                    }
+                    ta-ins := TouchArea { clicked => { root.page = pg; } mouse-cursor: pointer; }
                 }
                 Rectangle {}
+                // footer status
+                Rectangle {
+                    height: 30px; border-radius: 8px;
+                    background: T.panel;
+                    border-color: T.line; border-width: 1px;
+                    HorizontalLayout {
+                        padding-left: 10px; spacing: 7px;
+                        Rectangle {
+                            width: 7px; height: 7px; border-radius: 3.5px; y: 11px;
+                            background: G.connected ? T.green : T.danger;
+                        }
+                        Text { text: G.connected ? "service online" : "offline"; color: T.mut; font-size: 10px; vertical-alignment: center; }
+                    }
+                }
             }
         }
 
@@ -248,27 +476,18 @@ export component AppWindow inherits Window {
         VerticalLayout {
             // topbar
             Rectangle {
-                height: 52px;
-                background: #0d1118;
-                border-color: #1c2634;
-                border-width: 1px;
+                height: 60px;
                 HorizontalLayout {
-                    padding-left: 16px; padding-right: 16px; spacing: 10px;
+                    padding-left: 26px; padding-right: 26px; spacing: 12px;
                     VerticalLayout {
                         alignment: center;
-                        HorizontalLayout {
-                            spacing: 8px;
-                            Rectangle {
-                                width: 9px; height: 9px; border-radius: 5px; y: 5px;
-                                background: G.connected ? #3fb950 : #da3633;
-                            }
-                            Text { text: G.status_line; color: #8aa0b4; font-size: 12px; vertical-alignment: center; }
-                        }
+                        Text { text: root.page_names[root.page]; color: T.txt; font-size: 17px; font-weight: 800; }
                     }
-                    if G.paused : Chip { label: "PAUSED"; bg: #5a4020; fg: #ffc26e; }
-                    if G.pomodoro != "" && G.pomodoro != "off" : Chip { label: "POMO " + G.pomodoro; bg: #1f3a52; fg: #79c0ff; }
-                    if root.frozen_label != "" : Chip { label: root.frozen_label; bg: #521f2d; fg: #ff8ea3; }
                     Rectangle {}
+                    if G.paused : Pill { label: "PAUSED"; bg: #3a2a14; fg: T.amber; dot: T.amber; }
+                    if G.pomodoro != "" && G.pomodoro != "off" : Pill { label: "POMO · " + G.pomodoro; bg: #14294a; fg: T.blue; dot: T.blue; }
+                    if root.frozen_label != "" : Pill { label: root.frozen_label; bg: #3a1d33; fg: T.pink; dot: T.pink; }
+                    Pill { label: G.status_line; bg: T.panel; fg: T.mut; dot: G.connected ? T.green : T.danger; }
                 }
             }
 
@@ -278,51 +497,66 @@ export component AppWindow inherits Window {
 
                 // ======= Dashboard =======
                 if root.page == 0 : VerticalLayout {
-                    padding: 22px; spacing: 16px;
-                    Text { text: "Dashboard"; color: #e6edf3; font-size: 20px; font-weight: 700; }
+                    padding: 26px; padding-top: 6px; spacing: 16px;
                     HorizontalLayout {
                         spacing: 14px;
-                        Card {
-                            min-width: 210px; height: 92px;
+                        StatCard { label: "BLOCK LISTS"; value: G.blocks.length; icon: T.violet;
+                            sub: "managed rule groups"; }
+                        StatCard { label: "STATE REV"; value: G.rev; icon: T.blue;
+                            sub: "state pushes since boot"; }
+                        StatCard { label: "FROZEN"; icon: T.pink;
+                            value: root.frozen_label != "" ? fmt_dur(G.frozen_until - G.now) : "—";
+                            sub: root.frozen_label != "" ? "lockout remaining" : "no lockout active"; }
+                    }
+                    Card {
+                        height: 128px;
+                        HorizontalLayout {
+                            padding: 20px; spacing: 20px;
                             VerticalLayout {
-                                padding: 14px; spacing: 4px;
-                                Text { text: "Block lists"; color: #8aa0b4; font-size: 11px; }
-                                Text { text: G.blocks.length; color: #e6edf3; font-size: 26px; font-weight: 700; }
-                            }
-                        }
-                        Card {
-                            min-width: 210px; height: 92px;
-                            VerticalLayout {
-                                padding: 14px; spacing: 4px;
-                                Text { text: "State rev"; color: #8aa0b4; font-size: 11px; }
-                                Text { text: G.rev; color: #e6edf3; font-size: 26px; font-weight: 700; }
-                            }
-                        }
-                        Card {
-                            min-width: 210px; height: 92px;
-                            VerticalLayout {
-                                padding: 14px; spacing: 4px;
-                                Text { text: "Frozen"; color: #8aa0b4; font-size: 11px; }
-                                Text {
-                                    text: root.frozen_label != "" ? root.frozen_label : "inactive";
-                                    color: root.frozen_label != "" ? #ff8ea3 : #e6edf3;
-                                    font-size: 18px; font-weight: 700;
+                                spacing: 10px; alignment: center;
+                                SectionLabel { text: "GLOBAL CONTROL"; }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    Btn { label: G.paused ? "▶  Resume blocking" : "⏸  Pause 5 min"; primary: !G.paused; width: 170px;
+                                        clicked => { G.paused ? G.resume_global() : G.pause_global(300); } }
+                                    Btn { label: "◎  Focus mode"; width: 130px; clicked => { root.page = 2; } }
                                 }
+                            }
+                            Rectangle {}
+                            VerticalLayout {
+                                alignment: center; spacing: 4px;
+                                Text { text: "Blocking runs through the browser extension —"; color: T.faint; font-size: 10px; horizontal-alignment: right; }
+                                Text { text: "rule changes apply instantly on state push."; color: T.faint; font-size: 10px; horizontal-alignment: right; }
                             }
                         }
                     }
-                    Card {
-                        height: 120px;
-                        VerticalLayout {
-                            padding: 16px; spacing: 10px;
-                            Text { text: "GLOBAL"; color: #8aa0b4; font-size: 11px; font-weight: 700; }
-                            HorizontalLayout {
-                                spacing: 8px;
-                                Btn { label: G.paused ? "Resume" : "Pause 5m"; primary: !G.paused;
-                                    clicked => { G.paused ? G.resume_global() : G.pause_global(300); } }
-                                Btn { label: "Go to Focus"; clicked => { root.page = 2; } }
+                    // block list overview strip
+                    SectionLabel { text: "LISTS AT A GLANCE"; }
+                    ScrollView {
+                        HorizontalLayout {
+                            spacing: 10px;
+                            for b in G.blocks : Rectangle {
+                                height: 74px; min-width: 190px; border-radius: 12px;
+                                background: T.panel;
+                                border-color: T.line; border-width: 1px;
+                                VerticalLayout {
+                                    padding: 12px; spacing: 5px;
+                                    HorizontalLayout {
+                                        spacing: 7px;
+                                        Rectangle {
+                                            width: 7px; height: 7px; border-radius: 3.5px; y: 4px;
+                                            background: b.active ? T.green : (b.enabled ? T.amber : T.faint);
+                                        }
+                                        Text { text: b.name; color: T.txt; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                                        Rectangle {}
+                                        if b.lock != "" && b.lock != "none" : Pill { label: b.lock; bg: #3a1d33; fg: T.pink; }
+                                    }
+                                    Text {
+                                        text: (b.active ? "blocking now" : b.enabled ? "enabled" : "off") + "  ·  " + b.rules.length + " rules";
+                                        color: b.active ? T.green : T.faint; font-size: 10px;
+                                    }
+                                }
                             }
-                            Text { text: "Website blocking runs through the browser extension — rule changes apply instantly on state push."; color: #4d6175; font-size: 11px; }
                         }
                     }
                     Rectangle {}
@@ -330,14 +564,14 @@ export component AppWindow inherits Window {
 
                 // ======= Blocks =======
                 if root.page == 1 : HorizontalLayout {
-                    padding: 22px; spacing: 16px;
+                    padding: 26px; padding-top: 6px; spacing: 16px;
                     // list column
                     VerticalLayout {
-                        width: 300px; spacing: 8px;
+                        width: 310px; spacing: 10px;
                         HorizontalLayout {
                             spacing: 8px;
-                            new_name := Field { placeholder-text: "new block name…"; }
-                            Btn { label: "+"; width: 36px; primary: true;
+                            new_name := Field { placeholder-text: "New block list…"; }
+                            Btn { label: "+"; width: 38px; primary: true;
                                 clicked => {
                                     if new_name.text != "" {
                                         G.add_block(new_name.text);
@@ -348,28 +582,30 @@ export component AppWindow inherits Window {
                         }
                         ScrollView {
                             VerticalLayout {
-                                spacing: 6px;
+                                spacing: 8px; alignment: start;
                                 for b[i] in G.blocks : Rectangle {
-                                    height: 46px; border-radius: 8px;
-                                    background: root.sel == i ? #1b2740 : #131a24;
-                                    border-color: root.sel == i ? #2f6fed : #1f2a3a;
+                                    height: 52px; border-radius: 12px;
+                                    background: root.sel == i ? T.panel-2 : T.panel;
+                                    border-color: root.sel == i ? T.violet : T.line-soft;
                                     border-width: 1px;
                                     HorizontalLayout {
-                                        padding-left: 10px; padding-right: 10px; spacing: 6px;
+                                        padding-left: 14px; padding-right: 12px; spacing: 10px;
                                         Rectangle {
-                                            width: 8px; height: 8px; border-radius: 4px; y: 19px;
-                                            background: b.active ? #3fb950 : (b.enabled ? #d29922 : #3a4a5c);
+                                            width: 8px; height: 8px; border-radius: 4px; y: 22px;
+                                            background: b.active ? T.green : (b.enabled ? T.amber : T.faint);
                                         }
                                         VerticalLayout {
-                                            alignment: center;
-                                            Text { text: b.name; color: #e6edf3; font-size: 13px; font-weight: 600; }
+                                            alignment: center; spacing: 2px;
+                                            Text { text: b.name; color: T.txt; font-size: 13px; font-weight: 700; }
                                             Text {
                                                 text: (b.active ? "ACTIVE" : b.enabled ? "enabled" : "off")
-                                                    + " · " + b.rules.length + " rules"
-                                                    + (b.lock != "" && b.lock != "none" ? " · " + b.lock : "");
-                                                color: b.active ? #3fb950 : #5d7286; font-size: 10px;
+                                                    + "  ·  " + b.rules.length + " rules"
+                                                    + (b.lock != "" && b.lock != "none" ? "  ·  " + b.lock : "");
+                                                color: b.active ? T.green : T.faint; font-size: 10px;
                                             }
                                         }
+                                        Rectangle {}
+                                        Text { text: "›"; color: T.faint; font-size: 14px; vertical-alignment: center; }
                                     }
                                     TouchArea { clicked => { root.sel = i; } mouse-cursor: pointer; }
                                 }
@@ -381,48 +617,56 @@ export component AppWindow inherits Window {
                     if root.sel >= 0 && root.sel < G.blocks.length : Card {
                         ScrollView {
                             VerticalLayout {
-                                padding: 18px; spacing: 12px;
+                                padding: 22px; spacing: 14px; alignment: start;
                                 property <BlockRow> b: G.blocks[root.sel];
 
                                 HorizontalLayout {
                                     spacing: 10px;
-                                    Text { text: b.name; color: #e6edf3; font-size: 17px; font-weight: 700; }
-                                    if b.active : Chip { label: "ACTIVE"; bg: #14401f; fg: #3fb950; }
-                                    if b.lock != "" && b.lock != "none" : Chip { label: "lock: " + b.lock; bg: #521f2d; fg: #ff8ea3; }
-                                    if b.allow_mode : Chip { label: "allow-list"; bg: #1f3a52; fg: #79c0ff; }
-                                    if b.all_internet : Chip { label: "all-internet"; bg: #521f2d; fg: #ff8ea3; }
-                                    if b.allowance > 0 : Chip {
-                                        label: "allowance " + Math.floor(b.allowance_left / 60) + "m left";
-                                        bg: #5a4020; fg: #ffc26e;
+                                    Text { text: b.name; color: T.txt; font-size: 18px; font-weight: 800; }
+                                    if b.active : Pill { label: "ACTIVE"; bg: #173a2a; fg: T.green; dot: T.green; }
+                                    if b.lock != "" && b.lock != "none" : Pill { label: "LOCK " + b.lock; bg: #3a1d33; fg: T.pink; dot: T.pink; }
+                                    if b.allow_mode : Pill { label: "ALLOW-LIST"; bg: #14294a; fg: T.blue; }
+                                    if b.all_internet : Pill { label: "ALL INTERNET"; bg: #3a1d33; fg: T.pink; }
+                                    if b.allowance > 0 : Pill {
+                                        label: "ALLOWANCE " + Math.floor(b.allowance_left / 60) + "m";
+                                        bg: #3a2a14; fg: T.amber; dot: T.amber;
                                     }
                                     Rectangle {}
-                                    Btn { label: b.enabled ? "Stop" : "Start"; primary: !b.enabled; danger: b.enabled;
+                                    Btn { label: b.enabled ? "Stop" : "Start"; primary: !b.enabled; danger: b.enabled; width: 74px;
                                         clicked => {
                                             b.enabled ? G.stop_block(b.name) : G.start_block(b.name);
                                         }
                                     }
-                                    Btn { label: "Delete"; danger: true;
+                                    Btn { label: "Delete"; danger: true; width: 70px;
                                         clicked => { G.remove_block(b.name); root.sel = -1; }
                                     }
                                 }
 
-                                SectionTitle { text: "RULES (blocked)"; }
-                                for r in b.rules : Rectangle {
-                                    height: r.negated ? 0px : 26px;
-                                    if !r.negated : HorizontalLayout {
-                                        spacing: 8px;
-                                        Chip { label: r.kind; width: 64px; }
-                                        Text { text: r.value; color: #dbe7f3; font-size: 12px; vertical-alignment: center; }
-                                        Rectangle {}
-                                        Btn { label: "✕"; width: 30px; danger: true;
-                                            clicked => { G.remove_rule(b.name, r.value); } }
+                                SectionLabel { text: "BLOCKED RULES"; }
+                                Rectangle {
+                                    border-radius: 10px; background: T.input;
+                                    border-color: T.line-soft; border-width: 1px;
+                                    VerticalLayout {
+                                        padding: 6px; spacing: 2px;
+                                        for r in b.rules : Rectangle {
+                                            height: r.negated ? 0px : 30px;
+                                            if !r.negated : HorizontalLayout {
+                                                padding-left: 6px; spacing: 8px;
+                                                Pill { label: r.kind; width: 74px; bg: T.panel-2; fg: T.mut; }
+                                                Text { text: r.value; color: T.txt; font-size: 12px; vertical-alignment: center; }
+                                                Rectangle {}
+                                                Btn { label: "×"; width: 30px; height: 26px; danger: true;
+                                                    clicked => { G.remove_rule(b.name, r.value); } }
+                                            }
+                                        }
+                                        if b.rules.length == 0 : Text { text: "  No rules yet — add one below."; color: T.faint; font-size: 11px; }
                                     }
                                 }
                                 HorizontalLayout {
-                                    spacing: 6px;
-                                    kind_cb := ComboBox { width: 110px; model: ["domain", "url", "app", "keyword"]; }
+                                    spacing: 8px;
+                                    kind_cb := Pick { width: 110px; model: ["domain", "url", "app", "keyword", "wildcard", "regex", "path", "title"]; }
                                     rule_in := Field { placeholder-text: "example.com or app.exe…"; }
-                                    Btn { label: "Block it"; primary: true;
+                                    Btn { label: "Block it"; primary: true; width: 90px;
                                         clicked => {
                                             if rule_in.text != "" {
                                                 G.add_rule(b.name, kind_cb.current-value, rule_in.text);
@@ -432,22 +676,29 @@ export component AppWindow inherits Window {
                                     }
                                 }
 
-                                SectionTitle { text: "EXCEPTIONS (allowed)"; }
-                                for r in b.rules : Rectangle {
-                                    height: r.negated ? 24px : 0px;
-                                    if r.negated : HorizontalLayout {
-                                        spacing: 8px;
-                                        Chip { label: "allow"; bg: #14401f; fg: #3fb950; width: 64px; }
-                                        Text { text: r.value; color: #9ecb8f; font-size: 12px; vertical-alignment: center; }
-                                        Rectangle {}
-                                        Btn { label: "✕"; width: 30px; danger: true;
-                                            clicked => { G.remove_rule(b.name, r.value); } }
+                                SectionLabel { text: "EXCEPTIONS — ALWAYS ALLOWED"; }
+                                Rectangle {
+                                    border-radius: 10px; background: T.input;
+                                    border-color: T.line-soft; border-width: 1px;
+                                    VerticalLayout {
+                                        padding: 6px; spacing: 2px;
+                                        for r in b.rules : Rectangle {
+                                            height: r.negated ? 30px : 0px;
+                                            if r.negated : HorizontalLayout {
+                                                padding-left: 6px; spacing: 8px;
+                                                Pill { label: "allow"; bg: #173a2a; fg: T.green; width: 74px; }
+                                                Text { text: r.value; color: #9adfb4; font-size: 12px; vertical-alignment: center; }
+                                                Rectangle {}
+                                                Btn { label: "×"; width: 30px; height: 26px; danger: true;
+                                                    clicked => { G.remove_rule(b.name, r.value); } }
+                                            }
+                                        }
                                     }
                                 }
                                 HorizontalLayout {
-                                    spacing: 6px;
+                                    spacing: 8px;
                                     ex_in := Field { placeholder-text: "exception — allowed even while blocking…"; }
-                                    Btn { label: "Add exception";
+                                    Btn { label: "Add exception"; width: 110px;
                                         clicked => {
                                             if ex_in.text != "" {
                                                 G.add_exception(b.name, ex_in.text);
@@ -457,91 +708,117 @@ export component AppWindow inherits Window {
                                     }
                                 }
 
-                                SectionTitle { text: "LOCK"; }
+                                SectionLabel { text: "LOCK"; }
                                 HorizontalLayout {
-                                    spacing: 6px;
-                                    lock_cb := ComboBox { width: 130px; model: ["none", "timer", "range", "password", "random", "restart", "allowance", "enforced", "frozen"]; }
-                                    lock_arg := Field { placeholder-text: "until(s) / password / len…"; }
-                                    Btn { label: "Set lock";
+                                    spacing: 8px;
+                                    lock_cb := Pick { width: 130px; model: ["none", "timer", "range", "password", "random", "restart", "allowance", "enforced", "frozen"]; }
+                                    lock_arg := Field { width: 190px; placeholder-text: "until(s) / password / len…"; }
+                                    Btn { label: "Set lock"; width: 80px;
                                         clicked => { G.set_lock(b.name, lock_cb.current-value, lock_arg.text); }
                                     }
-                                    cred_in := Field { placeholder-text: "credential…"; }
-                                    Btn { label: "Unlock"; danger: true;
+                                    Rectangle {}
+                                    cred_in := Field { width: 190px; placeholder-text: "credential…"; }
+                                    Btn { label: "Unlock"; danger: true; width: 76px;
                                         clicked => { G.unlock(b.name, cred_in.text); }
                                     }
                                 }
 
-                                SectionTitle { text: "BREAKS"; }
+                                SectionLabel { text: "BREAKS"; }
                                 HorizontalLayout {
-                                    spacing: 6px;
+                                    spacing: 8px;
                                     Btn { label: "Delay break"; clicked => { G.delay_break(b.name); } }
                                     Btn { label: "Random-text break"; clicked => { G.random_break(b.name); } }
                                     Btn { label: "Cause break"; clicked => { G.cause_break(b.name); } }
+                                    Rectangle {}
                                     Btn { label: "End break"; danger: true; clicked => { G.end_break(b.name); } }
                                 }
+                                Rectangle { height: 10px; }
                             }
                         }
                     }
                     if !(root.sel >= 0 && root.sel < G.blocks.length) : Card {
-                        Text { text: "Select a block list on the left."; color: #4d6175; font-size: 13px; }
+                        VerticalLayout {
+                            alignment: center; spacing: 8px;
+                            Text { text: "■"; color: T.faint; font-size: 30px; horizontal-alignment: center; }
+                            Text { text: "Select a block list"; color: T.mut; font-size: 14px; font-weight: 600; horizontal-alignment: center; }
+                            Text { text: "Pick a list on the left to edit its rules,\nexceptions, lock and break controls."; color: T.faint; font-size: 11px; horizontal-alignment: center; }
+                        }
                     }
                 }
 
                 // ======= Focus =======
                 if root.page == 2 : VerticalLayout {
-                    padding: 22px; spacing: 16px;
-                    Text { text: "Focus"; color: #e6edf3; font-size: 20px; font-weight: 700; }
+                    padding: 26px; padding-top: 6px; spacing: 16px;
                     Card {
-                        height: 220px;
+                        height: 214px;
                         VerticalLayout {
-                            padding: 18px; spacing: 10px;
+                            padding: 20px; spacing: 12px;
                             HorizontalLayout {
                                 spacing: 10px;
-                                Text { text: "FROZEN MODE"; color: #8aa0b4; font-size: 12px; font-weight: 700; }
-                                if root.frozen_label != "" : Chip { label: root.frozen_label; bg: #521f2d; fg: #ff8ea3; }
-                                if G.frozen_locked : Chip { label: "locked"; bg: #5a4020; fg: #ffc26e; }
+                                Rectangle {
+                                    width: 30px; height: 30px; border-radius: 9px;
+                                    background: T.pink.with-alpha(0.16);
+                                    Text { text: "❄"; color: T.pink; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text { text: "FROZEN MODE"; color: T.txt; font-size: 11px; font-weight: 800; letter-spacing: 1.2px; }
+                                }
+                                if root.frozen_label != "" : Pill { label: root.frozen_label; bg: #3a1d33; fg: T.pink; dot: T.pink; }
+                                if G.frozen_locked : Pill { label: "LOCKED"; bg: #3a2a14; fg: T.amber; dot: T.amber; }
+                                Rectangle {}
                             }
-                            Text { text: "Full-screen lockout: kills non-allowlisted apps, covers the desktop until the timer ends."; color: #4d6175; font-size: 11px; }
+                            Text { text: "Full-screen lockout — kills non-allowlisted apps and covers the desktop until the timer ends."; color: T.faint; font-size: 11px; }
                             HorizontalLayout {
-                                spacing: 6px;
+                                spacing: 8px;
                                 fz_min := Field { width: 90px; placeholder-text: "minutes"; text: "60"; }
-                                fz_lock := ComboBox { width: 110px; model: ["none", "password", "random"]; }
-                                fz_arg := Field { width: 130px; placeholder-text: "password / len"; }
-                                Btn { label: "Start Frozen"; primary: true;
+                                fz_lock := Pick { width: 120px; model: ["none", "password", "random"]; }
+                                fz_arg := Field { width: 150px; placeholder-text: "password / len"; }
+                                Btn { label: "Start Frozen"; primary: true; width: 120px;
                                     clicked => { G.frozen_start(fz_min.text.to-float(), fz_lock.current-value, fz_arg.text); }
                                 }
                             }
                             HorizontalLayout {
-                                spacing: 6px;
+                                spacing: 8px;
                                 fz_cred := Field { placeholder-text: "credential to end early…"; }
-                                Btn { label: "End Frozen"; danger: true;
+                                Btn { label: "End Frozen"; danger: true; width: 110px;
                                     clicked => { G.frozen_stop(fz_cred.text); }
                                 }
                             }
                         }
                     }
                     Card {
-                        height: 170px;
+                        height: 172px;
                         VerticalLayout {
-                            padding: 18px; spacing: 10px;
+                            padding: 20px; spacing: 12px;
                             HorizontalLayout {
                                 spacing: 10px;
-                                Text { text: "POMODORO"; color: #8aa0b4; font-size: 12px; font-weight: 700; }
-                                if G.pomodoro != "" && G.pomodoro != "off" : Chip { label: G.pomodoro; bg: #1f3a52; fg: #79c0ff; }
+                                Rectangle {
+                                    width: 30px; height: 30px; border-radius: 9px;
+                                    background: T.orange.with-alpha(0.16);
+                                    Text { text: "◎"; color: T.orange; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text { text: "POMODORO"; color: T.txt; font-size: 11px; font-weight: 800; letter-spacing: 1.2px; }
+                                }
+                                if G.pomodoro != "" && G.pomodoro != "off" : Pill { label: G.pomodoro; bg: #14294a; fg: T.blue; dot: T.blue; }
+                                Rectangle {}
                             }
                             HorizontalLayout {
-                                spacing: 6px;
+                                spacing: 8px;
                                 for p in ["classic", "long", "sprint"] : Btn {
                                     label: p;
                                     clicked => { G.pomo("start", p); }
                                 }
                             }
                             HorizontalLayout {
-                                spacing: 6px;
+                                spacing: 8px;
                                 Btn { label: "Skip"; clicked => { G.pomo("skip", ""); } }
                                 Btn { label: "Pause"; clicked => { G.pomo("pause", ""); } }
                                 Btn { label: "Resume"; clicked => { G.pomo("resume", ""); } }
-                                Btn { label: "Stop"; danger: true; clicked => { G.pomo("stop", ""); } }
+                                Rectangle {}
+                                Btn { label: "Stop"; danger: true; width: 90px; clicked => { G.pomo("stop", ""); } }
                             }
                         }
                     }
@@ -550,24 +827,25 @@ export component AppWindow inherits Window {
 
                 // ======= Stats =======
                 if root.page == 3 : VerticalLayout {
-                    padding: 22px; spacing: 10px;
+                    padding: 26px; padding-top: 6px; spacing: 12px;
                     HorizontalLayout {
                         spacing: 10px;
-                        Text { text: "Stats"; color: #e6edf3; font-size: 20px; font-weight: 700; }
+                        Text { text: "Last 7 days"; color: T.mut; font-size: 12px; vertical-alignment: center; }
                         Rectangle {}
-                        Btn { label: "Refresh"; width: 90px; clicked => { G.refresh_stats(); } }
+                        Btn { label: "Refresh"; width: 100px; clicked => { G.refresh_stats(); } }
                     }
                     ScrollView {
                         Card {
                             VerticalLayout {
-                                padding: 14px; spacing: 4px;
+                                padding: 12px; spacing: 0px;
                                 for s in G.stats : HorizontalLayout {
-                                    spacing: 8px;
-                                    Text { text: s.group; color: #4d6175; font-size: 11px; width: 110px; }
-                                    Text { text: s.name; color: #dbe7f3; font-size: 12px; }
+                                    height: 30px; spacing: 10px;
+                                    Pill { label: s.group; width: 86px; bg: T.panel-2; fg: T.faint; }
+                                    Text { text: s.name; color: T.txt; font-size: 12px; vertical-alignment: center; }
                                     Rectangle {}
-                                    Text { text: s.value; color: #7fb0ff; font-size: 12px; }
+                                    Text { text: s.value; color: T.blue; font-size: 12px; vertical-alignment: center; }
                                 }
+                                if G.stats.length == 0 : Text { text: "  No stats yet."; color: T.faint; font-size: 12px; }
                             }
                         }
                     }
@@ -575,24 +853,27 @@ export component AppWindow inherits Window {
 
                 // ======= Audit =======
                 if root.page == 4 : VerticalLayout {
-                    padding: 22px; spacing: 10px;
+                    padding: 26px; padding-top: 6px; spacing: 12px;
                     HorizontalLayout {
                         spacing: 10px;
-                        Text { text: "Audit"; color: #e6edf3; font-size: 20px; font-weight: 700; }
+                        Text { text: "Enforcement event log"; color: T.mut; font-size: 12px; vertical-alignment: center; }
                         Rectangle {}
-                        Btn { label: "Refresh"; width: 90px; clicked => { G.refresh_audit(); } }
+                        Btn { label: "Refresh"; width: 100px; clicked => { G.refresh_audit(); } }
                     }
                     ScrollView {
                         Card {
                             VerticalLayout {
-                                padding: 14px; spacing: 3px;
+                                padding: 12px; spacing: 0px;
                                 for a in G.audits : HorizontalLayout {
-                                    spacing: 8px;
-                                    Text { text: a.time; color: #4d6175; font-size: 11px; width: 70px; }
-                                    Text { text: a.actor; color: #7fb0ff; font-size: 11px; width: 60px; }
-                                    Text { text: a.action; color: #e6edf3; font-size: 11px; width: 150px; }
-                                    Text { text: a.detail; color: #8aa0b4; font-size: 11px; }
+                                    height: 26px; spacing: 10px;
+                                    Text { text: a.time; color: T.faint; font-size: 11px; width: 64px; vertical-alignment: center; font-family: "Consolas"; }
+                                    Pill { label: a.actor; width: 52px;
+                                        bg: a.actor == "svc" ? #14294a : a.actor == "rpc" ? #2b1f5e : T.panel-2;
+                                        fg: a.actor == "svc" ? T.blue : a.actor == "rpc" ? T.violet : T.mut; }
+                                    Text { text: a.action; color: T.txt; font-size: 11px; width: 140px; vertical-alignment: center; font-weight: 600; }
+                                    Text { text: a.detail; color: T.mut; font-size: 11px; vertical-alignment: center; overflow: elide; }
                                 }
+                                if G.audits.length == 0 : Text { text: "  No events yet."; color: T.faint; font-size: 12px; }
                             }
                         }
                     }
