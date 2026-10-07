@@ -44,7 +44,7 @@ Source: "{#BinDir}\frozen-gui-tauri.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; without the runtime (absent on some Server installs; present on Win10/11)
 Source: "webview2-setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 ; extension bundle (page only — users load it / store listing post-MVP)
-Source: "..\extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs
+Source: "..\extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs; Excludes: "dev-key.pem,dev-pub.b64,dev-pub.der"
 ; browser-spawned native host at a stable, service-writable path
 Source: "{#BinDir}\frozen-nmh.exe";    DestDir: "{commonappdata}\Frozen\bin"; Flags: ignoreversion
 Source: "..\extension\com.frozen.frozen.json"; DestDir: "{commonappdata}\Frozen\bin"; Flags: ignoreversion
