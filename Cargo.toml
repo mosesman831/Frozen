@@ -8,6 +8,7 @@ members = [
     "crates/frozen-cli",
     "crates/frozen-nmh",
     "crates/frozen-gui",
+    "crates/frozen-gui-tauri",
 ]
 
 [workspace.dependencies]
