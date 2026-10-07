@@ -1,7 +1,8 @@
 ; Frozen — Inno Setup installer (spec §25)
 ; Layout:
 ;   {pf}\Frozen\            frozen.exe, frozen-svc.exe, frozen-helper.exe,
-;                           frozen-gui.exe, frozen-nmh.exe, extension\
+;                           frozen-gui.exe (slint fallback), frozen-gui-tauri.exe,
+;                           frozen-nmh.exe, extension\
 ;   {commonappdata}\Frozen\ bin\frozen-nmh.exe + com.frozen.frozen.json
 ;                           (browser-spawned host at a stable path), logs\,
 ;                           data-*.db (live state, kept on uninstall)
@@ -38,6 +39,10 @@ Source: "{#BinDir}\frozen-svc.exe";    DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\frozen-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\frozen-nmh.exe";    DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\frozen-gui.exe";    DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "{#BinDir}\frozen-gui-tauri.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; WebView2 evergreen bootstrapper — required by frozen-gui-tauri on machines
+; without the runtime (absent on some Server installs; present on Win10/11)
+Source: "webview2-setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 ; extension bundle (page only — users load it / store listing post-MVP)
 Source: "..\extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs
 ; browser-spawned native host at a stable, service-writable path
@@ -49,9 +54,10 @@ Name: "{commonappdata}\Frozen\bin"
 Name: "{commonappdata}\Frozen\logs"
 
 [Icons]
-Name: "{group}\Frozen"; Filename: "{app}\frozen-gui.exe"
+Name: "{group}\Frozen"; Filename: "{app}\frozen-gui-tauri.exe"
+Name: "{group}\Frozen (classic)"; Filename: "{app}\frozen-gui.exe"
 Name: "{group}\Uninstall Frozen"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\Frozen"; Filename: "{app}\frozen-gui.exe"; \
+Name: "{commondesktop}\Frozen"; Filename: "{app}\frozen-gui-tauri.exe"; \
     Tasks: desktopicon
 
 [Registry]
@@ -68,6 +74,9 @@ Root: HKLM; Subkey: "SOFTWARE\Microsoft\Edge\NativeMessagingHosts\com.frozen.fro
     Flags: uninsdeletekey
 
 [Run]
+; WebView2 runtime first — silent no-op when already installed
+Filename: "{tmp}\webview2-setup.exe"; Parameters: "/silent /install"; \
+    Flags: runhidden waituntilterminated; Check: not WebView2Installed
 ; install + start the enforcement service (sc.exe — Inno can't reliably
 ; spawn our own exe mid-install)
 Filename: "sc.exe"; Parameters: "create FrozenSvc binPath= ""\""{app}\frozen-svc.exe\"" --service"" start= auto"; \
@@ -92,6 +101,20 @@ Filename: "taskkill.exe"; Parameters: "/F /IM frozen-nmh.exe";    Flags: runhidd
 // {commonappdata}\Frozen\data-frozen.db via the frozen.session setting;
 // simplest honest gate: if the service answers `frozen status` as active,
 // bail out (the svc binary can answer read-only before we touch anything).
+// WebView2 runtime present? (evergreen client GUID, HKLM then HKCU)
+function WebView2Installed(): Boolean;
+var
+  Ver: String;
+begin
+  Result := RegQueryStringValue(HKLM,
+    'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
+    'pv', Ver) and (Ver <> '');
+  if not Result then
+    Result := RegQueryStringValue(HKCU,
+      'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
+      'pv', Ver) and (Ver <> '');
+end;
+
 function InitializeSetup(): Boolean;
 var
   Code: Integer;

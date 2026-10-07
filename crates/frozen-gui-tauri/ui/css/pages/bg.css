@@ -1,0 +1,13 @@
+/* Frozen — background addenda (css/pages/bg.css)
+ * Static fallback when WebGL is unavailable: js/bg.js adds
+ * .bg-static to #bg. Kept subtle — the tint + panels do the
+ * readability work. */
+
+#bg.bg-static{
+  background:
+    radial-gradient(75% 65% at 30% 32%, rgba(139,108,255,.34), rgba(139,108,255,0) 62%),
+    radial-gradient(60% 70% at 8% 78%,  rgba(74,51,216,.30),  rgba(74,51,216,0) 64%),
+    radial-gradient(55% 60% at 96% 22%, rgba(255,92,138,.30), rgba(255,92,138,0) 66%),
+    radial-gradient(45% 45% at 99% 62%, rgba(255,157,92,.20), rgba(255,157,92,0) 68%),
+    #0b0817;
+}

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Frozen</title>
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/pages/bg.css">
+<link rel="stylesheet" href="css/pages/blocks.css">
+<link rel="stylesheet" href="css/pages/focus.css">
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div id="bg-tint"></div>
+
+<div id="app">
+  <aside id="sidebar">
+    <div class="logo">
+      <span class="logo-mark">◆</span>
+      <span class="logo-text">Frozen</span>
+      <span class="logo-tag">blocker</span>
+    </div>
+    <nav id="nav">
+      <div class="nav-group">Control</div>
+      <button class="nav-item active" data-page="dashboard"><span class="nav-ico ico-violet">▲</span>Dashboard</button>
+      <button class="nav-item" data-page="blocks"><span class="nav-ico ico-pink">■</span>Blocks</button>
+      <button class="nav-item" data-page="focus"><span class="nav-ico ico-orange">◎</span>Focus</button>
+      <div class="nav-group">Insight</div>
+      <button class="nav-item" data-page="stats"><span class="nav-ico ico-blue">≡</span>Stats</button>
+      <button class="nav-item" data-page="audit"><span class="nav-ico ico-green">◆</span>Audit</button>
+    </nav>
+    <div class="sidebar-foot">
+      <span id="conn-dot" class="conn-dot off"></span>
+      <span id="conn-text">connecting…</span>
+    </div>
+  </aside>
+
+  <div id="main">
+    <header id="topbar">
+      <div>
+        <h1 id="page-title">Dashboard</h1>
+        <div id="page-sub" class="page-sub">Everything at a glance</div>
+      </div>
+      <div id="global-actions"></div>
+    </header>
+    <section id="page-dashboard" class="page active"></section>
+    <section id="page-blocks" class="page"></section>
+    <section id="page-focus" class="page"></section>
+    <section id="page-stats" class="page"></section>
+    <section id="page-audit" class="page"></section>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script src="js/mock.js"></script>
+<script src="js/bridge.js"></script>
+<script src="js/bg.js"></script>
+<script src="js/pages/dashboard.js"></script>
+<script src="js/pages/blocks.js"></script>
+<script src="js/pages/focus.js"></script>
+<script src="js/pages/stats.js"></script>
+<script src="js/pages/audit.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
