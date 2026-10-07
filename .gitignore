@@ -3,3 +3,4 @@ target/
 dist/
 node_modules/
 *.tsbuildinfo
+extension/dev-key.pem
