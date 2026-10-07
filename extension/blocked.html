@@ -7,37 +7,62 @@
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body {
-    margin: 0; min-height: 100vh; display: flex; align-items: center;
-    justify-content: center; background: #0b0e14; color: #e6e9f0;
-    font-family: "Segoe UI", system-ui, sans-serif;
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(900px 500px at 50% -10%, rgba(124,108,240,0.16), transparent 65%),
+      radial-gradient(700px 420px at 85% 110%, rgba(99,78,235,0.08), transparent 60%),
+      #09090b;
+    color: #e4e4e7;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  .card { text-align: center; max-width: 560px; padding: 48px; }
+  .card { text-align: center; max-width: 600px; padding: 48px 40px; }
   .mark {
-    width: 64px; height: 64px; margin: 0 auto 24px; border-radius: 16px;
-    background: linear-gradient(135deg, #4f8cff, #7b5cff);
+    width: 68px; height: 68px; margin: 0 auto 26px; border-radius: 19px;
+    background: linear-gradient(145deg, #2a2548, #171424);
+    border: 1px solid rgba(124,108,240,0.35);
+    box-shadow: 0 0 40px -6px rgba(124,108,240,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
     display: flex; align-items: center; justify-content: center;
-    font-size: 32px; font-weight: 700; color: #fff;
   }
-  h1 { font-size: 24px; font-weight: 600; margin: 0 0 8px; }
+  h1 { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 10px; }
   .site {
-    color: #8b93a7; font-size: 15px; word-break: break-all;
-    margin: 0 0 24px; font-family: Consolas, monospace;
+    display: inline-block; color: #a1a1aa; font-size: 14px; word-break: break-all;
+    margin: 0 0 30px; padding: 6px 14px; border-radius: 8px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    font-family: Consolas, "Cascadia Mono", monospace;
   }
-  .meta { color: #5a6276; font-size: 13px; line-height: 1.7; }
-  .meta b { color: #8b93a7; font-weight: 600; }
-  .hint { margin-top: 20px; }
+  .meta {
+    display: inline-flex; flex-direction: column; gap: 8px; text-align: left;
+    border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.025);
+    border-radius: 12px; padding: 16px 20px; min-width: 320px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+  .meta .row { display: flex; justify-content: space-between; gap: 32px; font-size: 13px; }
+  .meta .k { color: #63636e; letter-spacing: 0.02em; }
+  .meta .v { color: #d4d4d8; font-weight: 550; font-family: Consolas, monospace; }
+  .hint { margin-top: 28px; color: #52525b; font-size: 13px; }
+  .hint b { color: #8b8b96; font-weight: 550; }
 </style>
 </head>
 <body>
   <div class="card">
-    <div class="mark">❄</div>
-    <h1>This website is blocked</h1>
+    <div class="mark">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="2" x2="12" y2="22"/>
+        <line x1="3.34" y1="7" x2="20.66" y2="17"/>
+        <line x1="20.66" y1="7" x2="3.34" y2="17"/>
+        <path d="M12 2 9.5 4.5M12 2l2.5 2.5M12 22l-2.5-2.5M12 22l2.5-2.5"/>
+        <path d="M3.34 7 6 6.5M3.34 7l1 2.5M20.66 17l-2.66.5M20.66 17l-1-2.5"/>
+        <path d="M20.66 7 19 9.5M20.66 7 18 6.5M3.34 17l2.66-.5M3.34 17l1-2.5"/>
+      </svg>
+    </div>
+    <h1>This site is blocked</h1>
     <p class="site" id="u"></p>
     <div class="meta">
-      <div>Block list: <b id="b"></b></div>
-      <div>Matched rule: <b id="r"></b></div>
-      <div class="hint">Go back to work.</div>
+      <div class="row"><span class="k">Block list</span><span class="v" id="b"></span></div>
+      <div class="row"><span class="k">Matched rule</span><span class="v" id="r"></span></div>
     </div>
+    <div class="hint"><b>Frozen</b> · stay on task</div>
   </div>
 <script src="blocked.js"></script>
 </body>

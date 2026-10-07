@@ -22,8 +22,8 @@ export function Sidebar({ page, onNavigate }: { page: PageId; onNavigate: (p: Pa
 
   return (
     <aside className="flex w-[218px] shrink-0 flex-col border-r border-white/[0.06] bg-white/[0.015]">
-      {/* brand */}
-      <div className="flex h-14 items-center gap-2.5 border-b border-white/[0.06] px-4">
+      {/* brand — also part of the window drag strip */}
+      <div data-tauri-drag-region className="flex h-12 items-center gap-2.5 border-b border-white/[0.06] px-4 select-none">
         <div className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-400 to-violet-600 shadow-[0_0_18px_-2px_rgba(124,108,240,.7)]">
           <Snowflake className="size-4 text-white" strokeWidth={2.4} />
         </div>

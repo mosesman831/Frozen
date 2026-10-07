@@ -53,6 +53,19 @@ body {
   background: rgba(124, 108, 240, 0.35);
 }
 
+input,
+textarea {
+  caret-color: var(--color-primary);
+}
+
+::placeholder {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
 /* thin dark scrollbars */
 ::-webkit-scrollbar {
   width: 8px;
@@ -72,6 +85,7 @@ body {
 /* subdued keylines the shadcn way */
 .card {
   @apply rounded-xl border border-white/[0.06] bg-white/[0.02];
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
 .kbd {

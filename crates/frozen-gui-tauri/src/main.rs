@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 //! frozen-gui-tauri — WebView2 shell for the Frozen blocker UI.
 //! The frontend is plain HTML/CSS/JS in ./ui; this backend bridges it to
 //! frozen-svc over \\.\pipe\Frozen.App (identical protocol to frozen-gui):
@@ -11,8 +13,32 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, oneshot};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, WS_CAPTION,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+};
+
+fn strip_caption(hwnd_isize: isize) {
+    unsafe {
+        let hwnd = HWND(hwnd_isize as *mut std::ffi::c_void);
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        if style & (WS_CAPTION.0 as isize) != 0 {
+            SetWindowLongPtrW(hwnd, GWL_STYLE, style & !(WS_CAPTION.0 as isize));
+            let _ = SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+    }
+}
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -86,6 +112,19 @@ fn main() {
         .manage(bridge)
         .setup(move |app| {
             let handle = app.handle().clone();
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_decorations(false);
+                if let Ok(hwnd) = w.hwnd() {
+                    let h = hwnd.0 as isize;
+                    strip_caption(h);
+                    tauri::async_runtime::spawn(async move {
+                        for ms in [300u64, 800, 1600, 3000] {
+                            tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+                            strip_caption(h);
+                        }
+                    });
+                }
+            }
             tauri::async_runtime::spawn(io_loop(handle, bridge2));
             Ok(())
         })

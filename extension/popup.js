@@ -54,14 +54,19 @@ async function refresh() {
   for (const b of blocks) {
     const div = document.createElement("div");
     div.className = "block";
-    const lockName = (b.lock && (b.lock.type || b.lock)) || "none";
+    const lockName = typeof b.lock === "string"
+      ? b.lock
+      : (b.lock && typeof b.lock === "object" ? (b.lock.type || Object.keys(b.lock)[0]) : "none");
     const dotCls = b.active ? "dot on" : (lockName && lockName.toLowerCase() !== "none" ? "dot lock" : "dot");
     const left = document.createElement("span");
     const dot = document.createElement("span");
     dot.className = dotCls;
     const nm = document.createElement("span");
     nm.className = "nm";
-    nm.textContent = `${b.name} (${b.rules})`;
+    const ruleCount = Array.isArray(b.rules) ? b.rules.length : (b.rules || 0);
+    nm.textContent = lockName && lockName.toLowerCase() !== "none"
+      ? `${b.name} (${ruleCount}) · ${lockName.toLowerCase()}`
+      : `${b.name} (${ruleCount})`;
     left.appendChild(dot); left.appendChild(nm);
     div.appendChild(left);
     const btn = document.createElement("button");
