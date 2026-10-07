@@ -19,6 +19,16 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 struct Bridge {
     writer: Mutex<Option<mpsc::UnboundedSender<Envelope>>>,
     pending: Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>,
+    last_state: Mutex<Option<Value>>,
+    last_status: Mutex<Value>,
+}
+
+#[tauri::command]
+async fn snapshot(bridge: tauri::State<'_, Arc<Bridge>>) -> Result<Value, String> {
+    Ok(json!({
+        "status": bridge.last_status.lock().unwrap().clone(),
+        "state": bridge.last_state.lock().unwrap().clone(),
+    }))
 }
 
 #[tauri::command]
@@ -67,6 +77,8 @@ fn main() {
     let bridge = Arc::new(Bridge {
         writer: Mutex::new(None),
         pending: Mutex::new(HashMap::new()),
+        last_state: Mutex::new(None),
+        last_status: Mutex::new(json!({"connected": false, "detail": "connecting..."})),
     });
 
     let bridge2 = bridge.clone();
@@ -77,7 +89,7 @@ fn main() {
             tauri::async_runtime::spawn(io_loop(handle, bridge2));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![rpc])
+        .invoke_handler(tauri::generate_handler![rpc, snapshot])
         .run(tauri::generate_context!())
         .expect("error while running frozen-gui-tauri");
 }
@@ -93,10 +105,9 @@ async fn io_loop(app: AppHandle, bridge: Arc<Bridge>) {
             for tx in senders {
                 let _ = tx.send(Err("service offline".into()));
             }
-            let _ = app.emit(
-                "status",
-                json!({"connected": false, "detail": format!("{e}")}),
-            );
+            let st = json!({"connected": false, "detail": format!("{e}")});
+            *bridge.last_status.lock().unwrap() = st.clone();
+            let _ = app.emit("status", st);
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         } else {
             return;
@@ -125,13 +136,16 @@ async fn run(app: &AppHandle, bridge: &Arc<Bridge>) -> Result<()> {
         }
     });
     *bridge.writer.lock().unwrap() = Some(tx_w);
-    let _ = app.emit("status", json!({"connected": true, "detail": "service connected"}));
+    let st = json!({"connected": true, "detail": "service connected"});
+    *bridge.last_status.lock().unwrap() = st.clone();
+    let _ = app.emit("status", st);
 
     let res = async {
         loop {
             let env = read_env(&mut rd).await?;
             match env.op.as_str() {
                 op::STATE => {
+                    *bridge.last_state.lock().unwrap() = Some(env.payload.clone());
                     let _ = app.emit("state", env.payload);
                 }
                 op::OK => {

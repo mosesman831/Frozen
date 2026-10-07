@@ -102,6 +102,9 @@
       document.getElementById('conn-text').textContent =
         st.connected ? 'service connected' : (st.detail || 'offline');
     });
+    if (!window.Frozen.isMock && !(window.__TAURI__ && window.__TAURI__.core)) {
+      document.getElementById('conn-text').textContent = 'no backend bridge';
+    }
   }
 
   if (document.readyState === 'loading') {
