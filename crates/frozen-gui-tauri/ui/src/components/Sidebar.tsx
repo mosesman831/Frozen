@@ -29,7 +29,7 @@ export function Sidebar({ page, onNavigate }: { page: PageId; onNavigate: (p: Pa
         </div>
         <div className="flex flex-col">
           <span className="text-[13.5px] font-semibold tracking-tight text-foreground">Frozen</span>
-          <span className="text-[10px] leading-none text-zinc-500">Cold-turkey class blocker</span>
+          <span className="text-[10px] leading-none text-zinc-500">Distraction blocker</span>
         </div>
       </div>
 
