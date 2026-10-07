@@ -10,6 +10,13 @@ Most blockers write `0.0.0.0 site.com` into `hosts` and call it a day. That can'
 - **A SYSTEM service is the prison guard** — pushes the block config to the browser over native messaging, force-closes browsers whose extension goes dark during a locked block, watches itself back to life, and refuses to stop.
 - **Enforcement, not filtering** — the moat is anti-tamper: no task manager during locks, no clock-rolling (monotonic tamper clock), signed block state (SQLite tampering fails closed), pinned extension ID via `allowed_origins`.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Block lists](docs/screenshots/blocks.png) |
+| ![Focus — Frozen mode + pomodoro](docs/screenshots/focus.png) | ![Extension block page](docs/screenshots/blocked-page.png) |
+
 ## Features
 
 - **Block lists** with schedules (weekly grid, date ranges, phase-bound pomodoro lists)
