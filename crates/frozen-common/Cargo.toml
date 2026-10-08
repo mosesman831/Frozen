@@ -13,3 +13,7 @@ chrono = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
+windows = { workspace = true, features = [
+    "Win32_Security",
+    "Win32_Security_Authorization",
+] }

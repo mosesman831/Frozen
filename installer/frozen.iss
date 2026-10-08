@@ -9,7 +9,7 @@
 ;
 ; Build: iscc installer\frozen.iss   (after `cargo build --release`)
 
-#define AppVersion "1.0.1"
+#define AppVersion "1.0.2"
 #define BinDir "..\target\x86_64-pc-windows-gnu\release"
 
 [Setup]
