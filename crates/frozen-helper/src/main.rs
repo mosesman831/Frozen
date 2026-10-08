@@ -1,3 +1,4 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 //! frozen-helper — per-user agent: foreground sensor, watchdog heartbeat,
 //! notification sink. Tray UI is a later milestone; this runs headless.
 

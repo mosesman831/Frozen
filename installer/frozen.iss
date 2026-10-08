@@ -9,7 +9,7 @@
 ;
 ; Build: iscc installer\frozen.iss   (after `cargo build --release`)
 
-#define AppVersion "0.1.0"
+#define AppVersion "1.0.1"
 #define BinDir "..\target\x86_64-pc-windows-gnu\release"
 
 [Setup]
@@ -27,6 +27,11 @@ WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayName=Frozen
 CloseApplications=yes
+; Code signing: Smart App Control / SmartScreen will block unsigned builds.
+; Once a code-signing cert exists (installer/sign.ps1 signs the inner exes),
+; uncomment the two lines below so the installer + uninstaller are signed too.
+; SignTool=frozen /d $qFrozen Setup$q /fd sha256 /tr http://timestamp.digicert.com /td sha256 /a $f
+; SignedUninstaller=yes
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; \
@@ -40,6 +45,9 @@ Source: "{#BinDir}\frozen-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\frozen-nmh.exe";    DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\frozen-gui.exe";    DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "{#BinDir}\frozen-gui-tauri.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; tauri-build emits this next to the exe — gnu target links it dynamically,
+; so the installed copy fails to launch without it on a clean machine
+Source: "{#BinDir}\WebView2Loader.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 ; WebView2 evergreen bootstrapper — required by frozen-gui-tauri on machines
 ; without the runtime (absent on some Server installs; present on Win10/11)
 Source: "webview2-setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -128,5 +136,47 @@ begin
          ewWaitUntilTerminated, Code);
     Exec('taskkill.exe', '/F /IM frozen-nmh.exe', '', SW_HIDE,
          ewWaitUntilTerminated, Code);
+  end;
+end;
+
+// After [Run] finishes (sc create + sc start), verify the service actually
+// reached RUNNING — sc.exe failures are silently ignored by waituntilterminated,
+// which previously left installs "complete" with a dead service.
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Code: Integer;
+  Tries: Integer;
+  Started: Boolean;
+  OutFile, ErrText: String;
+  Raw: AnsiString;
+begin
+  if CurStep = ssPostInstall then begin
+    Started := False;
+    for Tries := 1 to 15 do begin
+      Sleep(1000);
+      if Exec('cmd.exe', '/c sc.exe query FrozenSvc | findstr /C:"RUNNING"', '',
+              SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0) then begin
+        Started := True;
+        break;
+      end;
+    end;
+    if not Started then begin
+      OutFile := ExpandConstant('{commonappdata}\Frozen\logs\install-scstart.txt');
+      Exec('cmd.exe', '/c sc.exe start FrozenSvc > "' + OutFile + '" 2>&1',
+           '', SW_HIDE, ewWaitUntilTerminated, Code);
+      ErrText := '';
+      if LoadStringFromFile(OutFile, Raw) then
+        ErrText := Trim(String(Raw));
+      Log('FrozenSvc failed to start: ' + ErrText);
+      if not WizardSilent() then
+        MsgBox('Frozen installed, but the FrozenSvc service could not be started.'
+          + #13#10#13#10
+          + 'This is usually security software (Smart App Control / antivirus) blocking the unsigned service binary.'
+          + #13#10#13#10 + ErrText + #13#10#13#10
+          + 'After allowing it, start the service as administrator:' + #13#10
+          + '    sc start FrozenSvc' + #13#10#13#10
+          + 'The app reconnects automatically once the service is running.',
+          mbCriticalError, MB_OK);
+    end;
   end;
 end;
