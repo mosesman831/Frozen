@@ -63,6 +63,10 @@ cd crates/frozen-gui-tauri/ui && npm install && npm run build
 
 The extension loads unpacked from `extension/` (developer mode) — the bundled dev public key pins a stable ID whitelisted in `allowed_origins`.
 
+## Install notes (Smart App Control / SmartScreen)
+
+Frozen binaries are currently **unsigned**. Windows Smart App Control (Win11, enforcement mode) and SmartScreen may block the installer or `frozen-svc.exe`. If the GUI opens but sits on "Can't reach the Frozen service", the service was almost certainly blocked — check `C:\ProgramData\Frozen\logs\install-scstart.txt`, allow the binary, and run `sc start FrozenSvc` as admin (the app reconnects on its own). Proper code signing is on the roadmap — see `installer/sign.ps1`.
+
 ## Safety notes
 
 - `frozen` CLI and the GUI talk to the service — blocks, locks and breaks are identical either way.
