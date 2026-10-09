@@ -27,7 +27,6 @@ Most blockers write `0.0.0.0 site.com` into `hosts` and call it a day. That can'
 - **Frozen mode** — whole-computer lockout: full-screen overlay, input enforcement
 - **Stats + audit log** — every block attempt, kill, lock change and RPC
 - **Beautiful desktop GUI** (Tauri + React + Tailwind), native-messaging bridged to the service
-- **Classic Slint GUI** bundled as a lightweight fallback
 
 ## Architecture
 

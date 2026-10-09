@@ -1,7 +1,7 @@
 ; Frozen — Inno Setup installer (spec §25)
 ; Layout:
 ;   {pf}\Frozen\            frozen.exe, frozen-svc.exe, frozen-helper.exe,
-;                           frozen-gui.exe (slint fallback), frozen-gui-tauri.exe,
+;                           frozen-gui-tauri.exe,
 ;                           frozen-nmh.exe, extension\
 ;   {commonappdata}\Frozen\ bin\frozen-nmh.exe + com.frozen.frozen.json
 ;                           (browser-spawned host at a stable path), logs\,
@@ -43,7 +43,6 @@ Source: "{#BinDir}\frozen.exe";        DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\frozen-svc.exe";    DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\frozen-helper.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\frozen-nmh.exe";    DestDir: "{app}"; Flags: ignoreversion
-Source: "{#BinDir}\frozen-gui.exe";    DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "{#BinDir}\frozen-gui-tauri.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 ; tauri-build emits this next to the exe — gnu target links it dynamically,
 ; so the installed copy fails to launch without it on a clean machine
@@ -61,9 +60,12 @@ Source: "..\extension\com.frozen.frozen.json"; DestDir: "{commonappdata}\Frozen\
 Name: "{commonappdata}\Frozen\bin"
 Name: "{commonappdata}\Frozen\logs"
 
+[InstallDelete]
+; classic slint GUI is no longer shipped — remove on upgrade
+Type: files; Name: "{app}\frozen-gui.exe"
+
 [Icons]
 Name: "{group}\Frozen"; Filename: "{app}\frozen-gui-tauri.exe"
-Name: "{group}\Frozen (classic)"; Filename: "{app}\frozen-gui.exe"
 Name: "{group}\Uninstall Frozen"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\Frozen"; Filename: "{app}\frozen-gui-tauri.exe"; \
     Tasks: desktopicon
